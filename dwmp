@@ -1,0 +1,385 @@
+#!/usr/bin/perl -w
+use strict;
+
+use Getopt::Long qw ( GetOptions );
+use Data::Dumper;
+
+my $script;
+($script = $0) =~ s!.*/!!;
+my $HELP_STRING="usage: $script --player=<sp(otify)|an(oise)|rh(ythmbox)> --command=<pp(playpause)|p(revious)|n(ext)> [--switch|-s] [--help|-h] [--debug|-d]\n";
+my $load_debug = 0;
+my ($cli_hflag, $cli_debug, $cli_player, $cli_command, $cli_switch);
+GetOptions ( "help"      => \$cli_hflag,
+             "debug"     => \$cli_debug,
+             "player=s"  => \$cli_player,
+             "command=s" => \$cli_command,
+             "switch"    => \$cli_switch
+           );
+
+my %command_list = (
+	n  => 'Next',
+	p  => 'Previous',
+	pp => 'PlayPause'
+);
+
+my %player_list = (
+	sp => {
+		default => 1,
+		name    => 'spotify',
+		run     => 'spotify >/dev/null 2>&1 &',
+		state   => 'OFF'
+	},
+	an => {
+		name    => 'anoise',
+		run     => 'anoise >/dev/null 2>&1 &',
+		state   => 'OFF'
+	},
+	rh => {
+		name    => 'rhythmbox',
+		run     => 'rhythmbox-client --play-pause',
+		state   => 'OFF'
+	}
+);
+
+# For $cli_switch
+my @player_list_order = ( 'an', 'rh', 'sp' );
+
+# Example ENUM
+use constant {
+	PLAYPAUSE    => 'PlayPause',
+	NEXT         => 'Next',
+	PREVIOUS     => 'Previous',
+	RUNNING      => 'RUNNING',
+	IDLE         => 'IDLE',
+	OFF          => 'OFF',
+	PP           => 'PlayPause',
+	N            => 'Next',
+	P            => 'Previous',
+	COLDSTART    => 4,
+	SPOTIFY      => 'sp'
+};
+
+my $pacmd      = "pacmd list-sink-inputs 2>/dev/null |";
+my $state_file = "$ENV{'HOME'}/bin/dwm/${script}.latest";
+
+# Check arguments phase
+# ---------------------
+if ( $cli_hflag ) {
+	print $HELP_STRING; exit 5;
+}
+elsif ( $ARGV[0] ) {
+	print "Unrecognized option:\n";
+	foreach (@ARGV) {
+		print "$_\n";
+	}
+	print $HELP_STRING; exit 5;
+}
+
+if ( ! ($cli_player or $cli_command or $cli_switch) ) {
+	print $HELP_STRING; exit 5;
+}
+
+if ( $cli_player ) {
+	unless ( exists $player_list{$cli_player} ) {
+		print "Il player passato non e' corretto: $cli_player\n";
+		print "Scegli fra: 'sp'(Spotify), 'an'(Anoise), 'rb'(Rhythmbox)\n";
+		exit 5;
+	}
+}
+if ( $cli_command ) {
+	if ( exists($command_list{$cli_command}) ) {
+		$cli_command = $command_list{$cli_command};
+	} else {
+		print "Il comando passato non e' corretto: $cli_command\n";
+		print "Scegli fra: 'pp'(PlayPause), 'p'(Previous), 'n'(Next)\n";
+		exit 5;
+	}
+}
+# 0. Initialization
+# -------------------
+my @sources;
+
+# 1. Load @sources with pacmd
+# ---------------------------
+open(PACMD,$pacmd) || die "Failed load by pacmd: $!\n";
+while ( <PACMD> ) {
+	chomp;
+	print "$_\n" if $load_debug;
+
+	if ( m/state:\h*(\w+)/) {
+		push @sources, { state => $1 };
+		print Dumper(\@sources) if $load_debug;
+	}
+	elsif ( m/application[.]name\h*=\h*"([^"]*)"/ ) {
+		$sources[$#sources]->{player}=&FilterPlayer($1);
+		print Dumper(\@sources) if $load_debug;
+	}
+}
+print Dumper(\@sources) if $load_debug;
+
+# 2. If empty load @sources by qdbus
+# ----------------------------------
+open(QDBUS,"qdbus |") || die "Failed load by qdbus: $!\n";
+while ( <QDBUS> ) {
+	chomp;
+	print "$_\n" if $load_debug;
+
+	if ( m/org[.]mpris[.]MediaPlayer2[.](\w*)/) {
+		my $pl = &FilterPlayer($1);
+		unless ( grep { $_->{player} eq $pl } @sources ) {
+			push @sources, { player => $pl };
+		}
+		print Dumper(\@sources) if $load_debug;
+	}
+}
+
+# 3. Set the actual state of the players
+# --------------------------------------
+#ALSA plug-in [python2.7]
+foreach ( @sources ) {
+	my $cp = &FilterPlayer($_->{player});
+	print Dumper(\@sources) if $load_debug;
+	if ( defined $_->{state} && $_->{state} eq RUNNING ) {
+		$player_list{$cp}{state} = RUNNING;
+	} else {
+		$player_list{$cp}{state} = IDLE;
+	}
+}
+
+print '%player_list: ' . Dumper(\%player_list) if $cli_debug;
+
+# Data preparation for choosing the player
+# ----------------------------------------
+my (@pl_running, @pl_idle, @pl_off, @pl_def,
+		@pl_not_lat_running,
+		@pl_not_cli_running, $pl_cli_state,
+		@pl_not_def_running, $def_player, $pl_def_state);
+
+my $latest_player; &ReadLatestState();
+
+@pl_running    = grep { $player_list{$_}{state} eq RUNNING } keys %player_list;
+@pl_idle       = grep { $player_list{$_}{state} eq IDLE    } keys %player_list;
+@pl_off        = grep { $player_list{$_}{state} eq OFF     } keys %player_list;
+@pl_def        = grep { defined $player_list{$_}{default}  } keys %player_list;
+print '@pl_running: ' . Dumper(\@pl_running) if $cli_debug;
+print '@pl_def: '     . Dumper(\@pl_def)     if $cli_debug;
+print '@pl_idle: '    . Dumper(\@pl_idle)    if $cli_debug;
+print '@pl_off: '     . Dumper(\@pl_off)     if $cli_debug;
+
+if ( $cli_player ) {
+	$pl_cli_state  = $player_list{$cli_player}{state};
+	@pl_not_cli_running = grep { $_ ne $cli_player } @pl_running;
+	print "cli_player    -> $cli_player\n"   if $cli_debug;
+	print "pl_cli_state  -> $pl_cli_state\n" if $cli_debug;
+	print "@pl_not_cli_running: " . Dumper(\@pl_not_cli_running) if $cli_debug;
+} else {
+	print "latest_player       -> $latest_player\n" if $cli_debug;
+	print "def_player (before) -> $pl_def[0]\n"     if $cli_debug;
+	if ( $latest_player ) {
+		$def_player = $latest_player;
+	} else {
+		$def_player = $pl_def[0] if @pl_def;
+	}
+	$pl_def_state = $player_list{$def_player}{state};
+	@pl_not_def_running = grep { $_ ne $def_player } @pl_running;
+	print "def_player (after)  -> $def_player\n" if $cli_debug;
+	print "pl_def_state        -> $pl_def_state\n"    if $cli_debug;
+	print '@pl_not_def_running: ' . Dumper(\@pl_not_def_running) if $cli_debug;
+}
+
+# NEW CASE: rotate between active players:
+# make the running player idle, make the first idle player running
+if ( $cli_switch ) {
+	if ( @pl_idle && $latest_player ) {
+		# Pause all running players
+		foreach ( @pl_running ) { &ExecuteQDbusCmd($_,PP,1); }
+		# get next idle player
+		my $pl_next = &getNextPlayer();
+		# execute Play on the chosen player
+		&ExecuteQDbusCmd($pl_next,PP);
+	}
+}
+# 4A. Case 1: player passed via command line
+# ------------------------------------------
+#	case A (off)
+# |- no running / idle  -> execute cli_player irrespective of the command
+#	case B (idle)
+# |- 1+ idle / 0 running (cli_player IDLE) -> apply command to the cli_player
+# |- 1+ idle / 0 running (cli_player OFF) -> execute cli_player irrespective of the command
+# case C (running)
+# |- 1+ running / 0+ idle (cli_player RUNNING) -> apply command to the cli_player, stop all the other ones
+# |- 1+ running / 0+ idle (cli_player IDLE) -> apply command to the cli_player, stop all the other ones
+# |- 1+ running / 0+ idle (cli_player OFF) -> execute cli_player irrespective of the command, stop all the other ones
+# CASE 1: cli_player
+elsif ( $cli_player ) {
+	print "CASE cli_player with pl_cli_state = $pl_cli_state\n" if $cli_debug;
+	print "Pausing all running players...\n" if $cli_debug;
+	# Mute all other potential players (without saving state)
+	foreach ( @pl_not_cli_running ) { &ExecuteQDbusCmd($_,PP,1); }
+	# Switch based on cli_player state
+	if ( $pl_cli_state eq OFF ) {
+		print "CASE pl_cli_state = $pl_cli_state (OFF)\n" if $cli_debug;
+		print "Executing $player_list{$cli_player}{run}\n" if $cli_debug;
+		system($player_list{$cli_player}{run});
+		if ( $cli_player eq SPOTIFY ) {
+			print "Sleeping " . COLDSTART . "s to wait for spotify to start." if $cli_debug;
+			sleep COLDSTART;
+			&ExecuteQDbusCmd($cli_player,PP);
+		}
+	}
+	elsif ( $pl_cli_state eq IDLE ) {
+		print "CASE pl_cli_state = $pl_cli_state (OFF)\n" if $cli_debug;
+		print "Executing $cli_command... \n" if $cli_debug;
+		&ExecuteQDbusCmd($cli_player,$cli_command);
+	}
+	elsif ( $pl_cli_state eq RUNNING ) {
+		print "CASE pl_cli_state = $pl_cli_state (OFF)\n" if $cli_debug;
+		print "Executing $cli_command... \n" if $cli_debug;
+		&ExecuteQDbusCmd($cli_player,$cli_command);
+	}
+}
+# CASE II: cli_player NOT specified at command line
+# -------------------------------------------------
+#	CASE A
+# |- no running / idle  (DEFAULT OFF) -> execute default irrespective of the command
+#	CASE B
+# |- 1 idle / 0 running (DEFAULT DCARE ) -> apply command to the single idle
+# |- 2+ idle / 0 running (DEFAULT IDLE)  -> take the default and apply
+# 																									commands to it
+# |- 2+ idle / 0 running (DEFAULT DCARE) -> take the first and
+# 																					apply commands to it
+# CASE C
+# |- 1 running / 0+ idle (DEFAULT DCARE) -> apply command to the single running
+# |
+# |- 2+ running / 0+ idle (DEFAULT RUNNING) -> stop all not default and apply
+# |                                            command to the default
+# |- 2+ running / 0+ idle (DEFAULT DCARE) -> stop all not first and apply
+#	|																					 command to the first one
+else {
+	print "CASE NOT CLI_PLAYER\n" if $cli_debug;
+	if ( @pl_running ) {
+		print "CASE \@pl_running\n" if $cli_debug;
+		if ( (scalar @pl_running) == 1 ) {
+			&ExecuteQDbusCmd($pl_running[0],$cli_command);
+		} # $#pl_running > 1
+		elsif ( $pl_def_state eq RUNNING ) {
+			# Send pause to all players (not default) running
+			foreach ( @pl_not_def_running ) { &ExecuteQDbusCmd($_,PP,1); }
+			&ExecuteQDbusCmd($def_player,$cli_command);
+		}
+		else {
+			my $pl_first = shift @pl_running;
+			# Pause all running player but first
+			foreach ( grep { $_ ne $pl_first } @pl_running ) { &ExecuteQDbusCmd($_,PP,1); }
+			&ExecuteQDbusCmd($pl_first,$cli_command);
+		}
+	}
+	elsif ( @pl_idle ) {
+		print "CASE \@pl_idle\n" if $cli_debug;
+		if ( (scalar @pl_idle) == 1 ) {
+			print "CASE scalar \@pl_idle == 1 (actually # ".($#pl_idle+1)."\n" if $cli_debug;
+			&ExecuteQDbusCmd($pl_idle[0],$cli_command);
+		} # $#pl_idle > 1
+		elsif ( $pl_def_state eq IDLE ) {
+			print "CASE \@pl_def_state == IDLE (actually -> $pl_def_state)\n" if $cli_debug;
+			&ExecuteQDbusCmd($def_player,$cli_command);
+		}
+		else {
+			print "CASE else \@pl_def_state != IDLE (actually -> $pl_def_state)\n" if $cli_debug;
+			my $pl_first = shift @pl_idle;
+			print "\$pl_first = $pl_first\n" if $cli_debug;
+			&ExecuteQDbusCmd($pl_first,$cli_command);
+		}
+	}
+	# No running or idle players
+	else {
+		print "CASE EXECUTE DEFAULT\n" if $cli_debug;
+		# Execute default without saving state
+		&ExecuteDefault();
+	}
+}
+
+# ---------------------
+# --- Subprocedures ---
+# ---------------------
+sub ExecuteDefault() {
+	`$player_list{$def_player}{run}`;
+	sleep COLDSTART;
+	&ExecuteQDbusCmd($def_player,PP);
+}
+sub ExecuteQDbusCmd() {
+
+	my $player      = shift;
+	my $cmd         = shift || PP;
+	my $skip_state  = shift || 0;
+
+	$player = $player_list{$player}{name};
+
+	my $cmd_string = "qdbus org.mpris.MediaPlayer2.$player /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.$cmd";
+	print "$cmd_string\n" if $cli_debug;
+	`$cmd_string`; # Actually execute the cmd
+	# Save the file only if the latest player is changed
+	if ( ! $latest_player ||
+		   ( $latest_player && $player_list{$latest_player}{name} ne $player ) ) {
+		&WriteLatestState($player) unless $skip_state;
+	}
+}
+
+sub FilterPlayer() {
+	my $player = shift;
+
+	# for anoise.py
+	$player =~ s/\..*$//;
+	# for rhythmbox
+	$player =~ s/[^[]*\[([^]]*)\].*/$1/;
+	# for spotify
+	$player = lc($player);
+
+	return substr $player, 0, 2;
+}
+
+sub ReadLatestState() {
+	print "Opening $state_file...\n" if $cli_debug;
+	if ( open(my $FH, "<:encoding(UTF-8)", $state_file) ) {
+		$latest_player = <$FH>;
+		chomp $latest_player if $latest_player;
+		close($FH) or warn "close failed: $!" if $cli_debug;
+		print "Latest player '$latest_player' loaded from '$state_file'\n" if $cli_debug;
+	}
+}
+
+sub WriteLatestState() {
+	my $pl = &FilterPlayer(shift);
+
+	if ( open WH, '>', $state_file ) {
+		print WH $pl;
+		close(WH) or warn "close failed: $!" if $cli_debug;
+		print "Latest player '$pl' saved to '$state_file'\n" if $cli_debug;
+	}
+	else {
+		warn "can't write state_file: $!" if $cli_debug;
+	}
+}
+
+
+sub getNextPlayer() {
+
+	print '(BEFORE) @player_list_order: ' . Dumper(\@player_list_order) if $cli_debug;
+	print '(BEFORE) $latest_player -> '. $latest_player . "\n" if $cli_debug;
+	my ($latest_idx) = grep { $player_list_order[$_] eq $latest_player } 0..$#player_list_order;
+	my $pl_number = scalar @player_list_order;
+	my $next_idx = $latest_idx;
+	my $next_pl;
+
+	print "(BEFORE) latest_idx -> $latest_idx\n" if $cli_debug;
+	print "(BEFORE) pl_number  -> $pl_number\n"  if $cli_debug;
+	print "(BEFORE) next_idx   -> $next_idx\n"   if $cli_debug;
+	do {
+		$next_idx = ( $next_idx + 1 ) % $pl_number;
+		$next_pl  = $player_list_order[$next_idx];
+		print "(CYCLE) next_idx -> $next_idx\n" if $cli_debug;
+		print "(CYCLE) next_pl  -> $next_pl\n"  if $cli_debug;
+		print "(CYCLE) player_list{next_pl}{state} -> $player_list{$next_pl}{state}\n" if $cli_debug;
+	} while ( $player_list{$next_pl}{state} ne IDLE && $next_idx != $latest_idx );
+	return $next_pl;
+}
