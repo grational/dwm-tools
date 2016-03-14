@@ -136,7 +136,7 @@ while ( <QDBUS> ) {
 # 3. Set the actual state of the players
 # --------------------------------------
 #ALSA plug-in [python2.7]
-foreach ( @sources ) {
+foreach ( grep { $_->{player} =~ m/^(an|sp|rh)$/ } @sources ) {
 	my $cp = &FilterPlayer($_->{player});
 	print Dumper(\@sources) if $load_debug;
 	if ( defined $_->{state} && $_->{state} eq RUNNING ) {
