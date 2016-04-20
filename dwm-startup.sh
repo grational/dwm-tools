@@ -14,10 +14,12 @@ redshift -l '45.090157:7.672748' &>/dev/null &
 clipmenud &
 
 # Enable dual monitor
-xrandr --output VGA1 --auto --right-of LVDS1
+xrandr --auto
+# xrandr --output VGA1 --auto --right-of LVDS1
 
 # Set background
-feh --bg-scale ~/Immagini/Wallpapers/code-wallpaper-18.png
+#feh --bg-scale ~/Immagini/Wallpapers/code-wallpaper-18.png
+feh --bg-scale ~/Immagini/Wallpapers/St.Louis-Gateway-Arc-Night.jpg
 
 # Remove mouse cursor from screen after 1s inactivity
 unclutter -root -idle 1 &
@@ -31,11 +33,16 @@ davmail &>/dev/null &
 # remove caps lock
 setxkbmap -layout it -variant us -option caps:escape
 
-# Fix Java Apps
-wmname LG3D
+## Fix Java Apps
+wmname LG3D # Pretend to be another window manager
+# Use motif toolkit for java applications
 #AWT_TOOLKIT=MToolkit; export AWT_TOOLKIT
+# Use env var to tell java that it's inside a non reparenting WM
+# _JAVA_AWT_WM_NONREPARENTING=1; export _JAVA_AWT_WM_NONREPARENTING
 
 # Start `dwm` with a modified status bar
+UPDATE_PERIOD='15s'
 while true; do
 	"${HOME}"/bin/dwm/dwm-tools/dwm-statusbar.sh
+  sleep "${UPDATE_PERIOD}"
 done &
