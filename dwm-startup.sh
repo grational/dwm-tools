@@ -18,8 +18,15 @@ xrandr --auto
 # xrandr --output VGA1 --auto --right-of LVDS1
 
 # Set background
-#feh --bg-scale ~/Immagini/Wallpapers/code-wallpaper-18.png
-feh --bg-scale ~/Immagini/Wallpapers/St.Louis-Gateway-Arc-Night.jpg
+left_image=~/Immagini/Wallpapers/St.Louis-Gateway-Arc-Night.jpg
+right_image=~/Immagini/Wallpapers/Hyatt-Terrazza.jpg
+# third_image=~/Immagini/Wallpapers/Hyatt-Meeting-room.jpg
+# old_image=~/Immagini/Wallpapers/code-wallpaper-18.png
+feh --bg-scale "${left_image}" "${right_image}"
+# Random per file
+#feh --randomize --bg-scale ~/Immagini/Wallpapers/{St.Louis,Hyatt}*
+# Random with dir
+#feh --recursive --randomize --bg-scale ~/Immagini/Wallpapers/
 
 # Remove mouse cursor from screen after 1s inactivity
 unclutter -root -idle 1 &

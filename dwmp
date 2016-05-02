@@ -56,7 +56,7 @@ use constant {
 	PP           => 'PlayPause',
 	N            => 'Next',
 	P            => 'Previous',
-	COLDSTART    => 4,
+	COLDSTART    => 8,
 	SPOTIFY      => 'sp'
 };
 
@@ -188,6 +188,7 @@ if ( $cli_player ) {
 	print '@pl_not_def_running: ' . Dumper(\@pl_not_def_running) if $cli_debug;
 }
 
+# OPTION bar: (get info for status bar update)
 # print current running player or '-' if none
 if ( $cli_bar ) {
   if ( @pl_running ) {
@@ -206,6 +207,8 @@ elsif ( $cli_switch ) {
 		my $pl_next = &getNextPlayer();
 		# execute Play on the chosen player
 		&ExecuteQDbusCmd($pl_next,PP);
+    # refresh the statusbar
+    system("dwm-statusbar.sh")
 	}
 }
 # 4A. Case 1: player passed via command line
@@ -235,16 +238,22 @@ elsif ( $cli_player ) {
 			sleep COLDSTART;
 			&ExecuteQDbusCmd($cli_player,PP);
 		}
+    # refresh the statusbar
+    system("dwm-statusbar.sh");
 	}
 	elsif ( $pl_cli_state eq IDLE ) {
 		print "CASE pl_cli_state = $pl_cli_state (OFF)\n" if $cli_debug;
 		print "Executing $cli_command... \n" if $cli_debug;
 		&ExecuteQDbusCmd($cli_player,$cli_command);
+    # refresh the statusbar if play/pause
+    system("dwm-statusbar.sh") if $cli_command eq PP;
 	}
 	elsif ( $pl_cli_state eq RUNNING ) {
 		print "CASE pl_cli_state = $pl_cli_state (OFF)\n" if $cli_debug;
 		print "Executing $cli_command... \n" if $cli_debug;
 		&ExecuteQDbusCmd($cli_player,$cli_command);
+    # refresh the statusbar if play/pause
+    system("dwm-statusbar.sh") if $cli_command eq PP;
 	}
 }
 # CASE II: cli_player NOT specified at command line
@@ -282,6 +291,8 @@ else {
 			foreach ( grep { $_ ne $pl_first } @pl_running ) { &ExecuteQDbusCmd($_,PP,1); }
 			&ExecuteQDbusCmd($pl_first,$cli_command);
 		}
+    # refresh the statusbar if play/pause
+    system("dwm-statusbar.sh") if $cli_command eq PP;
 	}
 	elsif ( @pl_idle ) {
 		print "CASE \@pl_idle\n" if $cli_debug;
@@ -299,12 +310,16 @@ else {
 			print "\$pl_first = $pl_first\n" if $cli_debug;
 			&ExecuteQDbusCmd($pl_first,$cli_command);
 		}
+    # refresh the statusbar if play/pause
+    system("dwm-statusbar.sh") if $cli_command eq PP;
 	}
 	# No running or idle players
 	else {
 		print "CASE EXECUTE DEFAULT\n" if $cli_debug;
 		# Execute default without saving state
 		&ExecuteDefault();
+    # refresh the statusbar
+    system("dwm-statusbar.sh");
 	}
 }
 
@@ -322,16 +337,35 @@ sub ExecuteQDbusCmd() {
 	my $cmd         = shift || PP;
 	my $skip_state  = shift || 0;
 
-	$player = $player_list{$player}{name};
+	my $player_name  = $player_list{$player}{name};
+	my $player_state = $player_list{$player}{state};
 
-	my $cmd_string = "qdbus org.mpris.MediaPlayer2.$player /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.$cmd";
+	my $cmd_string = "qdbus org.mpris.MediaPlayer2.$player_name /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.$cmd";
 	print "$cmd_string\n" if $cli_debug;
 	`$cmd_string`; # Actually execute the cmd
 	# Save the file only if the latest player is changed
 	if ( ! $latest_player ||
-		   ( $latest_player && $player_list{$latest_player}{name} ne $player ) ) {
-		&WriteLatestState($player) unless $skip_state;
+		   ( $latest_player && $latest_player ne $player ) ) {
+		&WriteLatestState($player_name) unless $skip_state;
 	}
+  # Custom notification only for Anoise player
+  # Quando attivare notify-send:
+  # - cold start anoise => attivare
+  # - playpause         => attivare se play (lo capiamo dallo stato precedente del player)
+  # - next / prev       => attivare (se player in play)
+  if ( $player_name eq 'anoise' ) {
+    if ( ( ($cmd eq PP) && ($player_state ne RUNNING) ) ||
+         ( ($player_state eq RUNNING) && ($cmd ne PP) ) ) {
+      &AnoiseNotifySend();
+    }
+  }
+}
+
+sub AnoiseNotifySend() {
+  my $anoise_track = `lsof -p \$(ps x | grep [a]noise.py | cut -d' ' -f1) | grep -oP '[^/]*(?=[.]ogg)' | tail -n1 | tr '_' ' ' | sed -r 's/\\b([a-z])/\\u\\1/g'`;
+  chomp $anoise_track;
+  #notify-send -t 2000 'Anoise' "Ambient track: 'bird2'"
+  system('notify-send','-t','2000','Anoise',"Ambient track: '${anoise_track}'")
 }
 
 sub FilterPlayer() {
