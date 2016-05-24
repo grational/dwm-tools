@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-WLAN="$(iwconfig wlan0 | grep -oP '(?<=ESSID:)\S*' | tr -d '"')"
+WLAN="$(iwconfig wlan0 | grep -oP '(?<=ESSID:)("[^"]*"|\S*)' | tr -d '"')"
 # WLAN="$(iwconfig wlan0 | grep -oP '(?<=ESSID:")[^"]*')"
 # Add ssh-agent to commit in github without asking for a password
 DBOX="$(dropbox status | head -n1 | cut -b1-3)"

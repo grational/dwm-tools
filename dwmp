@@ -6,15 +6,19 @@ use Data::Dumper;
 
 my $script;
 ($script = $0) =~ s!.*/!!;
-my $HELP_STRING="usage: $script --player=<sp(otify)|an(oise)|rh(ythmbox)> --command=<pp(playpause)|p(revious)|n(ext)> [--switch|-s] [--bar|-b] [--help|-h] [--debug|-d]\n";
+my $HELP_STRING="usage: $script --player=<sp(otify)|an(oise)|rh(ythmbox)> --command=<pp(playpause)|p(revious)|n(ext)> --find=<any_text_in_tags> --move=<[+-]HH:MM:SS|0-100%> [--switch|-s] [--bar|-b] [--help|-h] [--debug|-d]\n";
 my $load_debug = 0;
-my ($cli_hflag, $cli_debug, $cli_player, $cli_command, $cli_switch, $cli_bar);
+my $notify_timeout = 2000;
+my $player_filter = '^(an|sp|rh|mu)$';
+my ($cli_hflag, $cli_debug, $cli_player, $cli_command, $cli_switch, $cli_bar, $cli_find, $cli_move);
 GetOptions ( "help"      => \$cli_hflag,
              "debug"     => \$cli_debug,
              "player=s"  => \$cli_player,
              "command=s" => \$cli_command,
              "switch"    => \$cli_switch,
-             "bar"       => \$cli_bar
+             "bar"       => \$cli_bar,
+             "find=s"    => \$cli_find,
+             "move=s"    => \$cli_move
            );
 
 my %command_list = (
@@ -25,7 +29,6 @@ my %command_list = (
 
 my %player_list = (
 	sp => {
-		default => 1,
 		name    => 'spotify',
 		run     => 'spotify >/dev/null 2>&1 &',
 		state   => 'OFF'
@@ -39,11 +42,17 @@ my %player_list = (
 		name    => 'rhythmbox',
 		run     => 'rhythmbox-client --play-pause',
 		state   => 'OFF'
+	},
+	mu => {
+		default => 1,
+		name    => 'mpd',
+		run     => 'mpc play',
+		state   => 'OFF'
 	}
 );
 
 # For $cli_switch
-my @player_list_order = ( 'an', 'rh', 'sp' );
+my @player_list_order = ( 'an', 'mu', 'rh', 'sp' );
 
 # Example ENUM
 use constant {
@@ -57,7 +66,9 @@ use constant {
 	N            => 'Next',
 	P            => 'Previous',
 	COLDSTART    => 8,
-	SPOTIFY      => 'sp'
+	SPOTIFY      => 'sp',
+	MPD          => 'mu',
+  ANOISE       => 'an'
 };
 
 my $pacmd      = "pacmd list-sink-inputs 2>/dev/null |";
@@ -76,14 +87,19 @@ elsif ( $ARGV[0] ) {
 	print $HELP_STRING; exit 5;
 }
 
-if ( ! ($cli_player or $cli_command or $cli_switch or $cli_bar) ) {
+if ( ! ( $cli_player
+      or $cli_command
+      or $cli_switch
+      or $cli_bar
+      or $cli_find
+      or $cli_move) ) {
 	print $HELP_STRING; exit 5;
 }
 
 if ( $cli_player ) {
 	unless ( exists $player_list{$cli_player} ) {
 		print "Il player passato non e' corretto: $cli_player\n";
-		print "Scegli fra: 'sp'(Spotify), 'an'(Anoise), 'rb'(Rhythmbox)\n";
+		print "Scegli fra: 'sp'(Spotify), 'mu'(MPD), 'an'(Anoise), 'rb'(Rhythmbox)\n";
 		exit 5;
 	}
 }
@@ -116,6 +132,7 @@ while ( <PACMD> ) {
 		print Dumper(\@sources) if $load_debug;
 	}
 }
+print "After pacmd\n" if $load_debug;
 print Dumper(\@sources) if $load_debug;
 
 # 2. If empty load @sources by qdbus
@@ -133,11 +150,13 @@ while ( <QDBUS> ) {
 		print Dumper(\@sources) if $load_debug;
 	}
 }
+print "After qdbus\n" if $load_debug;
+print Dumper(\@sources) if $load_debug;
 
 # 3. Set the actual state of the players
 # --------------------------------------
 #ALSA plug-in [python2.7]
-foreach ( grep { $_->{player} =~ m/^(an|sp|rh)$/ } @sources ) {
+foreach ( grep { $_->{player} =~ m/$player_filter/ } @sources ) {
 	my $cp = &FilterPlayer($_->{player});
 	print Dumper(\@sources) if $load_debug;
 	if ( defined $_->{state} && $_->{state} eq RUNNING ) {
@@ -147,6 +166,7 @@ foreach ( grep { $_->{player} =~ m/^(an|sp|rh)$/ } @sources ) {
 	}
 }
 
+print 'After update of the state' if $cli_debug;
 print '%player_list: ' . Dumper(\%player_list) if $cli_debug;
 
 # Data preparation for choosing the player
@@ -174,7 +194,7 @@ if ( $cli_player ) {
 	print "pl_cli_state  -> $pl_cli_state\n" if $cli_debug;
 	print "@pl_not_cli_running: " . Dumper(\@pl_not_cli_running) if $cli_debug;
 } else {
-	print "latest_player       -> $latest_player\n" if $cli_debug;
+	print "latest_player       -> $latest_player\n" if $cli_debug && $latest_player;
 	print "def_player (before) -> $pl_def[0]\n"     if $cli_debug;
 	if ( $latest_player ) {
 		$def_player = $latest_player;
@@ -188,21 +208,42 @@ if ( $cli_player ) {
 	print '@pl_not_def_running: ' . Dumper(\@pl_not_def_running) if $cli_debug;
 }
 
+# NEW OPTION Seek
+if ( $cli_move ) {
+  if ( grep { $_ eq MPD } @pl_running ) {
+    system("mpc","seek", "$cli_move");
+  }
+}
 # OPTION bar: (get info for status bar update)
 # print current running player or '-' if none
-if ( $cli_bar ) {
+elsif ( $cli_bar ) {
   if ( @pl_running ) {
     print "$player_list{$pl_running[0]}{name}";
   } else {
     print "-";
   }
 }
+# CASE FIND: search via mpc and start the playlist obtained
+elsif ( $cli_find ) {
+  # Pause all running players
+  foreach ( @pl_running ) {
+    &ExecuteQDbusCmd($_,PP,1);
+    $player_list{$_}{state} = IDLE;
+  }
+  # find corresponding files and load them to the playlist
+  &FindNLoadMpcPlaylist($cli_find);
+  # execute Play on the MPD
+  &ExecuteQDbusCmd(MPD,PP);
+}
 # NEW CASE: rotate between active players:
 # make the running player idle, make the first idle player running
 elsif ( $cli_switch ) {
 	if ( @pl_idle && $latest_player ) {
 		# Pause all running players
-		foreach ( @pl_running ) { &ExecuteQDbusCmd($_,PP,1); }
+    foreach ( @pl_running ) {
+      &ExecuteQDbusCmd($_,PP,1);
+      $player_list{$_}{state} = IDLE;
+    }
 		# get next idle player
 		my $pl_next = &getNextPlayer();
 		# execute Play on the chosen player
@@ -227,7 +268,10 @@ elsif ( $cli_player ) {
 	print "CASE cli_player with pl_cli_state = $pl_cli_state\n" if $cli_debug;
 	print "Pausing all running players...\n" if $cli_debug;
 	# Mute all other potential players (without saving state)
-	foreach ( @pl_not_cli_running ) { &ExecuteQDbusCmd($_,PP,1); }
+	foreach ( @pl_not_cli_running ) {
+    &ExecuteQDbusCmd($_,PP,1);
+    $player_list{$_}{state} = IDLE;
+  }
 	# Switch based on cli_player state
 	if ( $pl_cli_state eq OFF ) {
 		print "CASE pl_cli_state = $pl_cli_state (OFF)\n" if $cli_debug;
@@ -282,13 +326,19 @@ else {
 		} # $#pl_running > 1
 		elsif ( $pl_def_state eq RUNNING ) {
 			# Send pause to all players (not default) running
-			foreach ( @pl_not_def_running ) { &ExecuteQDbusCmd($_,PP,1); }
+			foreach ( @pl_not_def_running ) {
+        &ExecuteQDbusCmd($_,PP,1);
+        $player_list{$_}{state} = IDLE;
+      }
 			&ExecuteQDbusCmd($def_player,$cli_command);
 		}
 		else {
 			my $pl_first = shift @pl_running;
 			# Pause all running player but first
-			foreach ( grep { $_ ne $pl_first } @pl_running ) { &ExecuteQDbusCmd($_,PP,1); }
+			foreach ( grep { $_ ne $pl_first } @pl_running ) {
+        &ExecuteQDbusCmd($_,PP,1);
+        $player_list{$_}{state} = IDLE;
+      }
 			&ExecuteQDbusCmd($pl_first,$cli_command);
 		}
     # refresh the statusbar if play/pause
@@ -326,6 +376,11 @@ else {
 # ---------------------
 # --- Subprocedures ---
 # ---------------------
+sub FindNLoadMpcPlaylist() {
+  my $key = shift;
+  `mpc clear; mpc search any "${key}" | mpc add`
+}
+
 sub ExecuteDefault() {
 	`$player_list{$def_player}{run}`;
 	sleep COLDSTART;
@@ -340,32 +395,51 @@ sub ExecuteQDbusCmd() {
 	my $player_name  = $player_list{$player}{name};
 	my $player_state = $player_list{$player}{state};
 
-	my $cmd_string = "qdbus org.mpris.MediaPlayer2.$player_name /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.$cmd";
+	my $cmd_string;
+  if ( $player eq MPD ) {
+    if ( $cmd eq PP ) {
+      $cmd_string = "mpc toggle"
+    }
+    elsif ( $cmd eq P ) {
+      $cmd_string = "mpc prev"
+    }
+    elsif ( $cmd eq N ) {
+      $cmd_string = "mpc next"
+    }
+  } else {
+    $cmd_string = "qdbus org.mpris.MediaPlayer2.$player_name /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.$cmd";
+  }
 	print "$cmd_string\n" if $cli_debug;
 	`$cmd_string`; # Actually execute the cmd
 	# Save the file only if the latest player is changed
 	if ( ! $latest_player ||
 		   ( $latest_player && $latest_player ne $player ) ) {
-		&WriteLatestState($player_name) unless $skip_state;
+		&WriteLatestState($player) unless $skip_state;
 	}
-  # Custom notification only for Anoise player
+  # Custom notification only for Anoise and MPD player
   # Quando attivare notify-send:
   # - cold start anoise => attivare
   # - playpause         => attivare se play (lo capiamo dallo stato precedente del player)
   # - next / prev       => attivare (se player in play)
-  if ( $player_name eq 'anoise' ) {
+  if (  ( $player eq ANOISE ) || ( $player eq MPD ) ) {
     if ( ( ($cmd eq PP) && ($player_state ne RUNNING) ) ||
          ( ($player_state eq RUNNING) && ($cmd ne PP) ) ) {
-      &AnoiseNotifySend();
+      &NotifySend($player);
     }
   }
 }
 
-sub AnoiseNotifySend() {
-  my $anoise_track = `lsof -p \$(ps x | grep [a]noise.py | cut -d' ' -f1) | grep -oP '[^/]*(?=[.]ogg)' | tail -n1 | tr '_' ' ' | sed -r 's/\\b([a-z])/\\u\\1/g'`;
-  chomp $anoise_track;
-  #notify-send -t 2000 'Anoise' "Ambient track: 'bird2'"
-  system('notify-send','-t','2000','Anoise',"Ambient track: '${anoise_track}'")
+sub NotifySend() {
+  my $player = shift;
+  my $track;
+
+  if ( $player eq ANOISE ) {
+    $track = `lsof -p \$(ps x | grep [a]noise.py | cut -d' ' -f1) | grep -oP '[^/]*(?=[.]ogg)' | tail -n1 | tr '_' ' ' | sed -r 's/\\b([a-z])/\\u\\1/g'`;
+  } elsif ( $player eq MPD ) {
+    $track = `mpc current`;
+  }
+  chomp $track;
+  system('notify-send','-t',$notify_timeout,uc($player_list{$player}{name}),"Track: '${track}'")
 }
 
 sub FilterPlayer() {
@@ -392,7 +466,8 @@ sub ReadLatestState() {
 }
 
 sub WriteLatestState() {
-	my $pl = &FilterPlayer(shift);
+  #my $pl = &FilterPlayer(shift);
+	my $pl = shift;
 
 	if ( open WH, '>', $state_file ) {
 		print WH $pl;

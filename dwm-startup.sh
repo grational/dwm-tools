@@ -1,3 +1,10 @@
+# If this is not dwm exit from the script
+# ( or as an alternative test:
+# if grep -q dwm <<<$XDG_DATA_DIRS; then... )
+if [[ "${GDMSESSION}" != 'dwm' ]]; then
+  return 0
+fi
+
 # Save X11 preferences
 # xrdb -merge ~/.Xresources
 
@@ -5,7 +12,7 @@
 xautolock -time 10 -locker slock &>/dev/null &
 
 # Redshift (for hurt less the eyes)
-redshift -l '45.090157:7.672748' &>/dev/null &
+# redshift -l '45.090157:7.672748' &>/dev/null &
 
 ## ssh-agent
 # eval $(/usr/bin/killall ssh-agent; /usr/bin/ssh-agent)
@@ -18,8 +25,8 @@ xrandr --auto
 # xrandr --output VGA1 --auto --right-of LVDS1
 
 # Set background
-left_image=~/Immagini/Wallpapers/St.Louis-Gateway-Arc-Night.jpg
-right_image=~/Immagini/Wallpapers/Hyatt-Terrazza.jpg
+left_image=~/Immagini/Wallpapers/Torino-dawn.jpg
+right_image=~/Immagini/Wallpapers/gartner-tech-hype-2016-inverted.png
 # third_image=~/Immagini/Wallpapers/Hyatt-Meeting-room.jpg
 # old_image=~/Immagini/Wallpapers/code-wallpaper-18.png
 feh --bg-scale "${left_image}" "${right_image}"
@@ -46,6 +53,11 @@ wmname LG3D # Pretend to be another window manager
 #AWT_TOOLKIT=MToolkit; export AWT_TOOLKIT
 # Use env var to tell java that it's inside a non reparenting WM
 # _JAVA_AWT_WM_NONREPARENTING=1; export _JAVA_AWT_WM_NONREPARENTING
+
+# Start Music Player Daemon, conf=~/.mpdconf
+if ! pgrep mpd &>/dev/null; then
+  mpd
+fi
 
 # Start `dwm` with a modified status bar
 UPDATE_PERIOD='15s'
