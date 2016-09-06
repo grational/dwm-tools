@@ -46,7 +46,7 @@ my %player_list = (
 	mu => {
 		default => 1,
 		name    => 'mpd',
-		run     => 'mpc play',
+		run     => 'true',
 		state   => 'OFF'
 	}
 );
@@ -68,7 +68,7 @@ use constant {
 	COLDSTART    => 8,
 	SPOTIFY      => 'sp',
 	MPD          => 'mu',
-  ANOISE       => 'an'
+	ANOISE       => 'an'
 };
 
 my $pacmd      = "pacmd list-sink-inputs 2>/dev/null |";
@@ -88,11 +88,11 @@ elsif ( $ARGV[0] ) {
 }
 
 if ( ! ( $cli_player
-      or $cli_command
-      or $cli_switch
-      or $cli_bar
-      or $cli_find
-      or $cli_move) ) {
+			or $cli_command
+			or $cli_switch
+			or $cli_bar
+			or $cli_find
+			or $cli_move) ) {
 	print $HELP_STRING; exit 5;
 }
 
@@ -210,53 +210,54 @@ if ( $cli_player ) {
 
 # NEW OPTION Seek
 if ( $cli_move ) {
-  if ( grep { $_ eq MPD } @pl_running ) {
-    system("mpc","seek", "$cli_move");
-  }
+	if ( grep { $_ eq MPD } @pl_running ) {
+		system("mpc","seek", "$cli_move");
+	}
 }
 # OPTION bar: (get info for status bar update)
 # print current running player or '-' if none
 elsif ( $cli_bar ) {
-  if ( @pl_running ) {
-    print "$player_list{$pl_running[0]}{name}";
-  } else {
-    print "-";
-  }
+	if ( @pl_running ) {
+		print "$player_list{$pl_running[0]}{name}";
+	} else {
+		print "-";
+	}
 }
 # CASE FIND: search via mpc and start the playlist obtained
 elsif ( $cli_find ) {
-  # Pause all running players
-  foreach ( @pl_running ) {
-    &ExecuteQDbusCmd($_,PP,1);
-    $player_list{$_}{state} = IDLE;
-  }
-  # find corresponding files and load them to the playlist
-  &FindNLoadMpcPlaylist($cli_find);
-  # execute Play on the MPD
-  &ExecuteQDbusCmd(MPD,PP);
+	# Pause all running players
+	foreach ( @pl_running ) {
+		&ExecuteQDbusCmd($_,PP,1);
+		$player_list{$_}{state} = IDLE;
+	}
+
+	# find corresponding files and load them to the playlist
+	&FindNLoadMpcPlaylist($cli_find);
+	# execute Play on the MPD
+	&ExecuteQDbusCmd(MPD,PP);
 }
 # NEW CASE: rotate between active players:
 # make the running player idle, make the first idle player running
 elsif ( $cli_switch ) {
 	if ( @pl_idle && $latest_player ) {
 		# Pause all running players
-    foreach ( @pl_running ) {
-      &ExecuteQDbusCmd($_,PP,1);
-      $player_list{$_}{state} = IDLE;
-    }
+		foreach ( @pl_running ) {
+			&ExecuteQDbusCmd($_,PP,1);
+			$player_list{$_}{state} = IDLE;
+		}
 		# get next idle player
 		my $pl_next = &getNextPlayer();
 		# execute Play on the chosen player
 		&ExecuteQDbusCmd($pl_next,PP);
-    # refresh the statusbar
-    system("dwm-statusbar.sh")
+		# refresh the statusbar
+		system("dwm-statusbar.sh")
 	}
 }
 # 4A. Case 1: player passed via command line
 # ------------------------------------------
-#	case A (off)
+#  case A (off)
 # |- no running / idle  -> execute cli_player irrespective of the command
-#	case B (idle)
+#  case B (idle)
 # |- 1+ idle / 0 running (cli_player IDLE) -> apply command to the cli_player
 # |- 1+ idle / 0 running (cli_player OFF) -> execute cli_player irrespective of the command
 # case C (running)
@@ -269,9 +270,9 @@ elsif ( $cli_player ) {
 	print "Pausing all running players...\n" if $cli_debug;
 	# Mute all other potential players (without saving state)
 	foreach ( @pl_not_cli_running ) {
-    &ExecuteQDbusCmd($_,PP,1);
-    $player_list{$_}{state} = IDLE;
-  }
+		&ExecuteQDbusCmd($_,PP,1);
+		$player_list{$_}{state} = IDLE;
+	}
 	# Switch based on cli_player state
 	if ( $pl_cli_state eq OFF ) {
 		print "CASE pl_cli_state = $pl_cli_state (OFF)\n" if $cli_debug;
@@ -282,41 +283,41 @@ elsif ( $cli_player ) {
 			sleep COLDSTART;
 			&ExecuteQDbusCmd($cli_player,PP);
 		}
-    # refresh the statusbar
-    system("dwm-statusbar.sh");
+		# refresh the statusbar
+		system("dwm-statusbar.sh");
 	}
 	elsif ( $pl_cli_state eq IDLE ) {
 		print "CASE pl_cli_state = $pl_cli_state (OFF)\n" if $cli_debug;
 		print "Executing $cli_command... \n" if $cli_debug;
 		&ExecuteQDbusCmd($cli_player,$cli_command);
-    # refresh the statusbar if play/pause
-    system("dwm-statusbar.sh") if $cli_command eq PP;
+		# refresh the statusbar if play/pause
+		system("dwm-statusbar.sh") if $cli_command eq PP;
 	}
 	elsif ( $pl_cli_state eq RUNNING ) {
 		print "CASE pl_cli_state = $pl_cli_state (OFF)\n" if $cli_debug;
 		print "Executing $cli_command... \n" if $cli_debug;
 		&ExecuteQDbusCmd($cli_player,$cli_command);
-    # refresh the statusbar if play/pause
-    system("dwm-statusbar.sh") if $cli_command eq PP;
+		# refresh the statusbar if play/pause
+		system("dwm-statusbar.sh") if $cli_command eq PP;
 	}
 }
 # CASE II: cli_player NOT specified at command line
 # -------------------------------------------------
-#	CASE A
+#  CASE A
 # |- no running / idle  (DEFAULT OFF) -> execute default irrespective of the command
-#	CASE B
+#  CASE B
 # |- 1 idle / 0 running (DEFAULT DCARE ) -> apply command to the single idle
 # |- 2+ idle / 0 running (DEFAULT IDLE)  -> take the default and apply
-# 																									commands to it
+#                                                   commands to it
 # |- 2+ idle / 0 running (DEFAULT DCARE) -> take the first and
-# 																					apply commands to it
+#                                           apply commands to it
 # CASE C
 # |- 1 running / 0+ idle (DEFAULT DCARE) -> apply command to the single running
 # |
 # |- 2+ running / 0+ idle (DEFAULT RUNNING) -> stop all not default and apply
 # |                                            command to the default
 # |- 2+ running / 0+ idle (DEFAULT DCARE) -> stop all not first and apply
-#	|																					 command to the first one
+#  |                                           command to the first one
 else {
 	print "CASE NOT CLI_PLAYER\n" if $cli_debug;
 	if ( @pl_running ) {
@@ -327,22 +328,22 @@ else {
 		elsif ( $pl_def_state eq RUNNING ) {
 			# Send pause to all players (not default) running
 			foreach ( @pl_not_def_running ) {
-        &ExecuteQDbusCmd($_,PP,1);
-        $player_list{$_}{state} = IDLE;
-      }
+				&ExecuteQDbusCmd($_,PP,1);
+				$player_list{$_}{state} = IDLE;
+			}
 			&ExecuteQDbusCmd($def_player,$cli_command);
 		}
 		else {
 			my $pl_first = shift @pl_running;
 			# Pause all running player but first
 			foreach ( grep { $_ ne $pl_first } @pl_running ) {
-        &ExecuteQDbusCmd($_,PP,1);
-        $player_list{$_}{state} = IDLE;
-      }
+				&ExecuteQDbusCmd($_,PP,1);
+				$player_list{$_}{state} = IDLE;
+			}
 			&ExecuteQDbusCmd($pl_first,$cli_command);
 		}
-    # refresh the statusbar if play/pause
-    system("dwm-statusbar.sh") if $cli_command eq PP;
+		# refresh the statusbar if play/pause
+		system("dwm-statusbar.sh") if $cli_command eq PP;
 	}
 	elsif ( @pl_idle ) {
 		print "CASE \@pl_idle\n" if $cli_debug;
@@ -360,16 +361,16 @@ else {
 			print "\$pl_first = $pl_first\n" if $cli_debug;
 			&ExecuteQDbusCmd($pl_first,$cli_command);
 		}
-    # refresh the statusbar if play/pause
-    system("dwm-statusbar.sh") if $cli_command eq PP;
+		# refresh the statusbar if play/pause
+		system("dwm-statusbar.sh") if $cli_command eq PP;
 	}
 	# No running or idle players
 	else {
 		print "CASE EXECUTE DEFAULT\n" if $cli_debug;
 		# Execute default without saving state
 		&ExecuteDefault();
-    # refresh the statusbar
-    system("dwm-statusbar.sh");
+		# refresh the statusbar
+		system("dwm-statusbar.sh");
 	}
 }
 
@@ -377,13 +378,23 @@ else {
 # --- Subprocedures ---
 # ---------------------
 sub FindNLoadMpcPlaylist() {
-  my $key = shift;
-  `mpc clear; mpc search any "${key}" | mpc add`
+	my $key = shift;
+	if ( $key =~ m/=([^~]+)/ ) {
+		my $upperkey = ucfirst lc $1;
+		`mpc clear; mpc find title "${upperkey}" | mpc add`
+	} elsif ( $key =~ m/([^,]+)\h*[,;:]\h*([^,]+)/ ) {
+		`mpc clear; mpc search title "${1}" artist "${2}" | mpc add`
+	} else {
+		`mpc clear; mpc search any "${key}" | mpc add`
+	}
+	return;
 }
 
 sub ExecuteDefault() {
-	`$player_list{$def_player}{run}`;
-	sleep COLDSTART;
+	if ( $def_player ne MPD ) {
+		`$player_list{$def_player}{run}`;
+		sleep COLDSTART;
+	}
 	&ExecuteQDbusCmd($def_player,PP);
 }
 sub ExecuteQDbusCmd() {
@@ -396,50 +407,50 @@ sub ExecuteQDbusCmd() {
 	my $player_state = $player_list{$player}{state};
 
 	my $cmd_string;
-  if ( $player eq MPD ) {
-    if ( $cmd eq PP ) {
-      $cmd_string = "mpc toggle"
-    }
-    elsif ( $cmd eq P ) {
-      $cmd_string = "mpc prev"
-    }
-    elsif ( $cmd eq N ) {
-      $cmd_string = "mpc next"
-    }
-  } else {
-    $cmd_string = "qdbus org.mpris.MediaPlayer2.$player_name /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.$cmd";
-  }
-	print "$cmd_string\n" if $cli_debug;
+	if ( $player eq MPD ) {
+		if ( $cmd eq PP ) {
+			$cmd_string = "mpc toggle"
+		}
+		elsif ( $cmd eq P ) {
+			$cmd_string = "mpc prev"
+		}
+		elsif ( $cmd eq N ) {
+			$cmd_string = "mpc next"
+		}
+	} else {
+		$cmd_string = "qdbus org.mpris.MediaPlayer2.$player_name /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.$cmd";
+	}
+	print "[EXECUTE] $cmd_string\n" if $cli_debug;
 	`$cmd_string`; # Actually execute the cmd
 	# Save the file only if the latest player is changed
 	if ( ! $latest_player ||
-		   ( $latest_player && $latest_player ne $player ) ) {
+			 ( $latest_player && $latest_player ne $player ) ) {
 		&WriteLatestState($player) unless $skip_state;
 	}
-  # Custom notification only for Anoise and MPD player
-  # Quando attivare notify-send:
-  # - cold start anoise => attivare
-  # - playpause         => attivare se play (lo capiamo dallo stato precedente del player)
-  # - next / prev       => attivare (se player in play)
-  if (  ( $player eq ANOISE ) || ( $player eq MPD ) ) {
-    if ( ( ($cmd eq PP) && ($player_state ne RUNNING) ) ||
-         ( ($player_state eq RUNNING) && ($cmd ne PP) ) ) {
-      &NotifySend($player);
-    }
-  }
+	# Custom notification only for Anoise and MPD player
+	# Quando attivare notify-send:
+	# - cold start anoise => attivare
+	# - playpause         => attivare se play (lo capiamo dallo stato precedente del player)
+	# - next / prev       => attivare (se player in play)
+	if (  ( $player eq ANOISE ) || ( $player eq MPD ) ) {
+		if ( ( ($cmd eq PP) && ($player_state ne RUNNING) ) ||
+				 ( ($player_state eq RUNNING) && ($cmd ne PP) ) ) {
+			&NotifySend($player);
+		}
+	}
 }
 
 sub NotifySend() {
-  my $player = shift;
-  my $track;
+	my $player = shift;
+	my $track;
 
-  if ( $player eq ANOISE ) {
-    $track = `lsof -p \$(ps x | grep [a]noise.py | cut -d' ' -f1) | grep -oP '[^/]*(?=[.]ogg)' | tail -n1 | tr '_' ' ' | sed -r 's/\\b([a-z])/\\u\\1/g'`;
-  } elsif ( $player eq MPD ) {
-    $track = `mpc current`;
-  }
-  chomp $track;
-  system('notify-send','-t',$notify_timeout,uc($player_list{$player}{name}),"Track: '${track}'")
+	if ( $player eq ANOISE ) {
+		$track = `lsof -p \$(ps x | awk '/anoise[.]py/ {print \$1}') | grep -oP '[^/]*(?=[.]ogg)' | tail -n1 | tr '_' ' ' | sed -r 's/\\b([a-z])/\\u\\1/g'`;
+	} elsif ( $player eq MPD ) {
+		$track = `mpc current` || 'no track found';
+	}
+	chomp $track;
+	system('notify-send','-t',$notify_timeout,uc($player_list{$player}{name}),"Track: '${track}'")
 }
 
 sub FilterPlayer() {
@@ -466,7 +477,7 @@ sub ReadLatestState() {
 }
 
 sub WriteLatestState() {
-  #my $pl = &FilterPlayer(shift);
+	#my $pl = &FilterPlayer(shift);
 	my $pl = shift;
 
 	if ( open WH, '>', $state_file ) {
@@ -481,7 +492,6 @@ sub WriteLatestState() {
 
 
 sub getNextPlayer() {
-
 	print '(BEFORE) @player_list_order: ' . Dumper(\@player_list_order) if $cli_debug;
 	print '(BEFORE) $latest_player -> '. $latest_player . "\n" if $cli_debug;
 	my ($latest_idx) = grep { $player_list_order[$_] eq $latest_player } 0..$#player_list_order;

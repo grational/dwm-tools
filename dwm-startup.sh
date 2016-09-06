@@ -11,7 +11,7 @@ fi
 # Lock the screen after 10m inactivity
 xautolock -time 10 -locker slock &>/dev/null &
 
-# Redshift (for hurt less the eyes)
+# Redshift (to hurt less the eyes)
 # redshift -l '45.090157:7.672748' &>/dev/null &
 
 ## ssh-agent
@@ -24,19 +24,17 @@ clipmenud &
 xrandr --auto
 # xrandr --output VGA1 --auto --right-of LVDS1
 
-# Set background
-left_image=~/Immagini/Wallpapers/Torino-dawn.jpg
-right_image=~/Immagini/Wallpapers/gartner-tech-hype-2016-inverted.png
-# third_image=~/Immagini/Wallpapers/Hyatt-Meeting-room.jpg
-# old_image=~/Immagini/Wallpapers/code-wallpaper-18.png
-feh --bg-scale "${left_image}" "${right_image}"
-# Random per file
-#feh --randomize --bg-scale ~/Immagini/Wallpapers/{St.Louis,Hyatt}*
-# Random with dir
-#feh --recursive --randomize --bg-scale ~/Immagini/Wallpapers/
+# set custom wallpapers
+"${HOME}"/bin/wallpaper-refresh
 
 # Remove mouse cursor from screen after 1s inactivity
 unclutter -root -idle 1 &
+
+# Run timidity in pulseaudio-compatible mode (mostly to use vkeyboard)
+#$ if [ -z "$(pgrep timidity)" ]; then
+#if ! pgrep timidity &>/dev/null; then
+#timidity -iA -Os --background &>/dev/null
+#fi
 
 # run dropbox
 dropbox start &>/dev/null &

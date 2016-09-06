@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Script: dwm-audio.sh
 # Author: Giuseppe Ricupero
-# E-mail: <giuseppe.ricupero@polito.com>
+# E-mail: <giuseppe.ricupero@polito.it>
 # Description: questo script deve poter emulare le funzionalità di:
 # - incremento del volume con amixer
 # - decremento del volume con amixer
@@ -64,12 +64,14 @@ case "$1" in
     shift
     ;;
   -i|--inc-volume)
-    amixer -q sset Master 3%+
+    #amixer -q sset Master 3%+
+    pactl set-sink-volume 0 +5%
     dwm-statusbar.sh
     shift
     ;;
   -d|--dec-volume)
-    amixer -q sset Master 3%-
+    #amixer -q sset Master 3%-
+    pactl set-sink-volume 0 -- -5%
     dwm-statusbar.sh
     shift
     ;;

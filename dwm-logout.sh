@@ -5,10 +5,9 @@
 # [SeatDefaults]
 # session-cleanup-script=/usr/local/bin/dwm-logout.sh
 
-Pgrep ()
-{
-    grep_string=\[${1:0:1}\]${1:1};
-    ps wwaux | grep --color=auto "${grep_string}"
+Pgrep () {
+  grep_string=\[${1:0:1}\]${1:1};
+  ps wwaux | grep --color=auto "${grep_string}"
 }
 
 Pgrep lightdm-session | awk '{print $2}' | xargs kill
