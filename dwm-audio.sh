@@ -71,7 +71,8 @@ case "$1" in
     ;;
   -d|--dec-volume)
     #amixer -q sset Master 3%-
-    pactl set-sink-volume 0 -- -5%
+    #pactl set-sink-volume 0 -- -5%
+    pactl set-sink-volume 0 -5%
     dwm-statusbar.sh
     shift
     ;;

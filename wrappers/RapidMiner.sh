@@ -1,3 +1,3 @@
 #!/bin/bash
 
-~/Applicazioni/RapidMiner/rapidminer-studio/RapidMiner-Studio.sh &
+~/Applicazioni/RapidMiner/rapidminer-studio/RapidMiner-Studio.sh "${@}" &
