@@ -38,6 +38,7 @@ GetOptions ( "help"      => \$cli_hflag,
 
 # Initialization {{{
 my %command_list = (
+	i  => 'Info',
 	n  => 'Next',
 	p  => 'Previous',
 	pp => 'PlayPause'
@@ -75,12 +76,14 @@ use constant {
 	PLAYPAUSE    => 'PlayPause',
 	NEXT         => 'Next',
 	PREVIOUS     => 'Previous',
+	INFO         => 'Info',
 	RUNNING      => 'RUNNING',
 	IDLE         => 'IDLE',
 	OFF          => 'OFF',
 	PP           => 'PlayPause',
 	N            => 'Next',
 	P            => 'Previous',
+	I            => 'Info',
 	COLDSTART    => 8,
 	SPOTIFY      => 'sp',
 	MPD          => 'mu',
@@ -125,7 +128,7 @@ if ( $cli_command ) {
 		$cli_command = $command_list{$cli_command};
 	} else {
 		print "Il comando passato non e' corretto: $cli_command\n";
-		print "Scegli fra: 'pp'(PlayPause), 'p'(Previous), 'n'(Next)\n";
+		print "Scegli fra: 'pp'(PlayPause), 'p'(Previous), 'n'(Next), 'i'(Info)\n";
 		exit 5;
 	}
 } # }}}
@@ -432,26 +435,29 @@ sub ExecuteQDbusCmd() { # {{{
 	my $player_name  = $player_list{$player}{name};
 	my $player_state = $player_list{$player}{state};
 
-	my $cmd_string;
-	if ( $player eq MPD ) {
-		if ( $cmd eq PP ) {
-			$cmd_string = "mpc toggle"
+	if ( $cmd ne I ) {
+		my $cmd_string;
+		if ( $player eq MPD ) {
+			if ( $cmd eq PP ) {
+				$cmd_string = "mpc toggle"
+			}
+			elsif ( $cmd eq P ) {
+				$cmd_string = "mpc prev"
+			}
+			elsif ( $cmd eq N ) {
+				$cmd_string = "mpc next"
+			}
+		} else {
+			$cmd_string = "qdbus org.mpris.MediaPlayer2.$player_name /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.$cmd";
 		}
-		elsif ( $cmd eq P ) {
-			$cmd_string = "mpc prev"
+		print "[EXECUTE] $cmd_string\n" if $cli_debug;
+		`$cmd_string`; # Actually execute the cmd
+
+		# Save the file only if the latest player is changed
+		if ( ! $latest_player ||
+				 ( $latest_player && $latest_player ne $player ) ) {
+			&WriteLatestState($player) unless $skip_state;
 		}
-		elsif ( $cmd eq N ) {
-			$cmd_string = "mpc next"
-		}
-	} else {
-		$cmd_string = "qdbus org.mpris.MediaPlayer2.$player_name /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.$cmd";
-	}
-	print "[EXECUTE] $cmd_string\n" if $cli_debug;
-	`$cmd_string`; # Actually execute the cmd
-	# Save the file only if the latest player is changed
-	if ( ! $latest_player ||
-			 ( $latest_player && $latest_player ne $player ) ) {
-		&WriteLatestState($player) unless $skip_state;
 	}
 	# Custom notification only for Anoise and MPD player
 	# Quando attivare notify-send:
@@ -459,15 +465,17 @@ sub ExecuteQDbusCmd() { # {{{
 	# - playpause         => attivare se play (lo capiamo dallo stato precedente del player)
 	# - next / prev       => attivare (se player in play)
 	if (  ( $player eq ANOISE ) || ( $player eq MPD ) ) {
-		if ( ( ($cmd eq PP) && ($player_state ne RUNNING) ) ||
-				 ( ($player_state eq RUNNING) && ($cmd ne PP) ) ) {
-			&NotifySend($player);
+		if ( ( ($cmd eq PP) && ($player_state ne RUNNING) ) 
+			|| ( ($player_state eq RUNNING) && ($cmd ne PP) ) 
+		) {
+			&NotifySend($player, $player_state);
 		}
 	}
 } # }}}
 
 sub NotifySend() { # {{{
-	my $player = shift;
+	my $player       = shift;
+	my $player_state = shift;
 	my $track;
 
 	if ( $player eq ANOISE ) {
