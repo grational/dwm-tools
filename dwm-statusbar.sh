@@ -12,7 +12,7 @@ fi
 WLAN="$(nmcli device wifi list | sed -rn '1d; /^[*]/ s/ {2,}/;/gp' | awk -F';' '{print $2, $7}')"
 [[ ! $WLAN ]] && WLAN='-'
 #VOL="$(amixer get Master | grep -oP 'off(?=\])|\d+%(?=.*\[on\])')"
-VOL="$(pactl list sinks | perl -ne 'local $/; my $stdin = <>; print "$1" if ($stdin =~ /N[ao]me:\h+alsa_output.pci.*?Mut[eo]:\h+(?:off|no).*?Volume:.*?(\d+%)/s)')"
+VOL="$(pactl list sinks | perl -ne 'local $/; my $stdin = <>; print "$1" if ($stdin =~ /N[ao]me:\h+alsa_output.pci(?:.(?!\n\n))*?Mut[eo]:\h+(?:off|no).*?Volume:.*?(\d+%)/s)')"
 [[ ! $VOL ]] && VOL='off'
 #VOL="$(amixer get Master | egrep -o '[0-9]+%')"
 #VOL="$(amixer get Master | awk '/[0-9]+%/ { gsub(/[][]/,""); printf("%s",$4)  }')"
