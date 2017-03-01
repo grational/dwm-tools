@@ -4,6 +4,7 @@ use strict;
 use Getopt::Long qw ( GetOptions );
 use Data::Dumper;
 
+# Specify command line parameters {{{
 my $script;
 ($script = $0) =~ s!.*/!!;
 my $HELP_STRING="usage: $script --player=<sp(otify)|an(oise)|rh(ythmbox)> --command=<pp(playpause)|p(revious)|n(ext)> --find=<any_text_in_tags> --move=<[+-]HH:MM:SS|0-100%> [--switch|-s] [--bar|-b] [--help|-h] [--debug|-d]\n";
@@ -20,7 +21,9 @@ GetOptions ( "help"      => \$cli_hflag,
              "find=s"    => \$cli_find,
              "move=s"    => \$cli_move
            );
+# }}}
 
+# Initialization {{{
 my %command_list = (
 	n  => 'Next',
 	p  => 'Previous',
@@ -73,8 +76,9 @@ use constant {
 
 my $pacmd      = "pacmd list-sink-inputs 2>/dev/null |";
 my $state_file = "$ENV{'HOME'}/bin/dwm/${script}.latest";
+# }}}
 
-# Check arguments phase
+# Check arguments phase {{{
 # ---------------------
 if ( $cli_hflag ) {
 	print $HELP_STRING; exit 5;
@@ -111,13 +115,11 @@ if ( $cli_command ) {
 		print "Scegli fra: 'pp'(PlayPause), 'p'(Previous), 'n'(Next)\n";
 		exit 5;
 	}
-}
-# 0. Initialization
-# -------------------
-my @sources;
+} # }}}
 
-# 1. Load @sources with pacmd
+# 1. Load @sources with pacmd {{{
 # ---------------------------
+my @sources;
 open(PACMD,$pacmd) || die "Failed load by pacmd: $!\n";
 while ( <PACMD> ) {
 	chomp;
@@ -134,8 +136,9 @@ while ( <PACMD> ) {
 }
 print "After pacmd\n" if $load_debug;
 print Dumper(\@sources) if $load_debug;
+# }}}
 
-# 2. If empty load @sources by qdbus
+# 2. If empty load @sources by qdbus {{{
 # ----------------------------------
 open(QDBUS,"qdbus |") || die "Failed load by qdbus: $!\n";
 while ( <QDBUS> ) {
@@ -152,8 +155,9 @@ while ( <QDBUS> ) {
 }
 print "After qdbus\n" if $load_debug;
 print Dumper(\@sources) if $load_debug;
+# }}}
 
-# 3. Set the actual state of the players
+# 3. Set the actual state of the players {{{
 # --------------------------------------
 #ALSA plug-in [python2.7]
 foreach ( grep { $_->{player} =~ m/$player_filter/ } @sources ) {
@@ -164,12 +168,14 @@ foreach ( grep { $_->{player} =~ m/$player_filter/ } @sources ) {
 	} else {
 		$player_list{$cp}{state} = IDLE;
 	}
-}
+} # }}}
 
+# Debug messages after state control {{{
 print 'After update of the state' if $cli_debug;
 print '%player_list: ' . Dumper(\%player_list) if $cli_debug;
+# }}}
 
-# Data preparation for choosing the player
+# Data preparation for choosing the player # {{{
 # ----------------------------------------
 my (@pl_running, @pl_idle, @pl_off, @pl_def,
 		@pl_not_lat_running,
@@ -206,15 +212,17 @@ if ( $cli_player ) {
 	print "def_player (after)  -> $def_player\n" if $cli_debug;
 	print "pl_def_state        -> $pl_def_state\n"    if $cli_debug;
 	print '@pl_not_def_running: ' . Dumper(\@pl_not_def_running) if $cli_debug;
-}
+} # }}}
 
-# NEW OPTION Seek
+# CASE SEEK: move forward or backward of 5ss {{{
+# (just for mpd)
 if ( $cli_move ) {
 	if ( grep { $_ eq MPD } @pl_running ) {
 		system("mpc","seek", "$cli_move");
 	}
-}
-# OPTION bar: (get info for status bar update)
+} # }}}
+
+# CASE BAR: get info for status bar update {{{
 # print current running player or '-' if none
 elsif ( $cli_bar ) {
 	if ( @pl_running ) {
@@ -222,8 +230,9 @@ elsif ( $cli_bar ) {
 	} else {
 		print "-";
 	}
-}
-# CASE FIND: search via mpc and start the playlist obtained
+} # }}}
+
+# CASE FIND: search via mpc and start the playlist obtained {{{
 elsif ( $cli_find ) {
 	# Pause all running players
 	foreach ( @pl_running ) {
@@ -235,8 +244,9 @@ elsif ( $cli_find ) {
 	&FindNLoadMpcPlaylist($cli_find);
 	# execute Play on the MPD
 	&ExecuteQDbusCmd(MPD,PP);
-}
-# NEW CASE: rotate between active players:
+} # }}}
+
+# CASE ROTATE: rotate between active players {{{
 # make the running player idle, make the first idle player running
 elsif ( $cli_switch ) {
 	if ( @pl_idle && $latest_player ) {
@@ -252,9 +262,10 @@ elsif ( $cli_switch ) {
 		# refresh the statusbar
 		system("dwm-statusbar.sh")
 	}
-}
-# 4A. Case 1: player passed via command line
-# ------------------------------------------
+} # }}}
+
+# CASE I: cli_player specified through command line {{{
+# -------------------------------------------------
 #  case A (off)
 # |- no running / idle  -> execute cli_player irrespective of the command
 #  case B (idle)
@@ -300,9 +311,10 @@ elsif ( $cli_player ) {
 		# refresh the statusbar if play/pause
 		system("dwm-statusbar.sh") if $cli_command eq PP;
 	}
-}
-# CASE II: cli_player NOT specified at command line
-# -------------------------------------------------
+} # }}}
+
+# CASE II: cli_player NOT specified through command line {{{
+# ------------------------------------------------------
 #  CASE A
 # |- no running / idle  (DEFAULT OFF) -> execute default irrespective of the command
 #  CASE B
@@ -317,7 +329,7 @@ elsif ( $cli_player ) {
 # |- 2+ running / 0+ idle (DEFAULT RUNNING) -> stop all not default and apply
 # |                                            command to the default
 # |- 2+ running / 0+ idle (DEFAULT DCARE) -> stop all not first and apply
-#  |                                           command to the first one
+# |                                            command to the first one
 else {
 	print "CASE NOT CLI_PLAYER\n" if $cli_debug;
 	if ( @pl_running ) {
@@ -372,12 +384,12 @@ else {
 		# refresh the statusbar
 		system("dwm-statusbar.sh");
 	}
-}
+} # }}}
 
 # ---------------------
 # --- Subprocedures ---
 # ---------------------
-sub FindNLoadMpcPlaylist() {
+sub FindNLoadMpcPlaylist() { # {{{
 	my $key = shift;
 	if ( $key =~ m/=([^~]+)/ ) {
 		my $upperkey = ucfirst lc $1;
@@ -388,16 +400,17 @@ sub FindNLoadMpcPlaylist() {
 		`mpc clear; mpc search any "${key}" | mpc add`
 	}
 	return;
-}
+} # }}}
 
-sub ExecuteDefault() {
+sub ExecuteDefault() { # {{{
 	if ( $def_player ne MPD ) {
 		`$player_list{$def_player}{run}`;
 		sleep COLDSTART;
 	}
 	&ExecuteQDbusCmd($def_player,PP);
-}
-sub ExecuteQDbusCmd() {
+} # }}}
+
+sub ExecuteQDbusCmd() { # {{{
 
 	my $player      = shift;
 	my $cmd         = shift || PP;
@@ -438,9 +451,9 @@ sub ExecuteQDbusCmd() {
 			&NotifySend($player);
 		}
 	}
-}
+} # }}}
 
-sub NotifySend() {
+sub NotifySend() { # {{{
 	my $player = shift;
 	my $track;
 
@@ -451,9 +464,9 @@ sub NotifySend() {
 	}
 	chomp $track;
 	system('notify-send','-t',$notify_timeout,uc($player_list{$player}{name}),"Track: '${track}'")
-}
+} # }}}
 
-sub FilterPlayer() {
+sub FilterPlayer() { # {{{
 	my $player = shift;
 
 	# for anoise.py
@@ -464,9 +477,9 @@ sub FilterPlayer() {
 	$player = lc($player);
 
 	return substr $player, 0, 2;
-}
+} # }}}
 
-sub ReadLatestState() {
+sub ReadLatestState() { # {{{
 	print "Opening $state_file...\n" if $cli_debug;
 	if ( open(my $FH, "<:encoding(UTF-8)", $state_file) ) {
 		$latest_player = <$FH>;
@@ -474,9 +487,9 @@ sub ReadLatestState() {
 		close($FH) or warn "close failed: $!" if $cli_debug;
 		print "Latest player '$latest_player' loaded from '$state_file'\n" if $cli_debug;
 	}
-}
+} # }}}
 
-sub WriteLatestState() {
+sub WriteLatestState() { # {{{
 	#my $pl = &FilterPlayer(shift);
 	my $pl = shift;
 
@@ -488,10 +501,9 @@ sub WriteLatestState() {
 	else {
 		warn "can't write state_file: $!" if $cli_debug;
 	}
-}
+} # }}}
 
-
-sub getNextPlayer() {
+sub getNextPlayer() { # {{{
 	print '(BEFORE) @player_list_order: ' . Dumper(\@player_list_order) if $cli_debug;
 	print '(BEFORE) $latest_player -> '. $latest_player . "\n" if $cli_debug;
 	my ($latest_idx) = grep { $player_list_order[$_] eq $latest_player } 0..$#player_list_order;
@@ -510,4 +522,6 @@ sub getNextPlayer() {
 		print "(CYCLE) player_list{next_pl}{state} -> $player_list{$next_pl}{state}\n" if $cli_debug;
 	} while ( $player_list{$next_pl}{state} ne IDLE && $next_idx != $latest_idx );
 	return $next_pl;
-}
+} # }}}
+
+# vim: fdm=marker
