@@ -33,11 +33,9 @@ if acpi -a | grep off-line > /dev/null; then
 	BAT="$(acpi -b | cut -d' ' -f4 | tr -d '%,')"
 	xsetroot -name "${HEAD} | BAT: ${BAT}% | ${TAIL}"
 	# Ask to suspend if lower than 10%
-	if [[ $BAT -eq 10 ]] || [[ $BAT -lt 5 ]]; then
-		if zenity --question --timeout 8 --text="Low battery ($BAT%). Suspend?"; then
-			sudo pm-suspend
-		fi
-	elif [[ $BAT -le 2 ]]; then
+	if [[ $BAT -le 10 ]]; then
+		xsetroot -name "LOW BATTERY! ${BAT}%"
+	elif [[ $BAT -le 3 ]]; then
 		sudo pm-suspend
 	fi
 else
