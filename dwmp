@@ -21,7 +21,8 @@ usage:
 END_USAGE
 
 my $load_debug = 0;
-my $notify_timeout = 2000;
+# ignored in ubuntu / gnome shell (see: man notify-send )
+my $notify_timeout = 2000; 
 my $player_filter = '^(an|sp|rh|mu)$';
 my ($cli_hflag, $cli_debug, $cli_player, $cli_command, $cli_switch, $cli_bar, $cli_find, $cli_move);
 GetOptions ( "help"      => \$cli_hflag,
