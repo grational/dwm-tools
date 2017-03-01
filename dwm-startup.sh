@@ -36,7 +36,8 @@ unclutter -root -idle 1 &
 #fi
 
 # run dropbox
-dropbox start &>/dev/null &
+ionice -c 3 dropbox start -i &>/dev/null &
+cpulimit -b -e dropbox -l 20
 
 # run davmail to connect to exchange SeatPG server
 davmail &>/dev/null &
