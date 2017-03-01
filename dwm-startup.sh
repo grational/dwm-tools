@@ -18,7 +18,7 @@ xautolock -time 10 -locker slock &>/dev/null &
 # eval $(/usr/bin/killall ssh-agent; /usr/bin/ssh-agent)
 
 # Clipboard Manager
-clipmenud &
+# clipmenud &
 
 # Enable dual monitor
 xrandr --auto
