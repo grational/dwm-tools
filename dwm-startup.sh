@@ -22,7 +22,6 @@ xautolock -time 10 -locker slock &>/dev/null &
 
 # Enable dual monitor
 xrandr --auto
-# xrandr --output VGA1 --auto --right-of LVDS1
 
 # set custom wallpapers
 "${HOME}"/bin/wallpaper-refresh
