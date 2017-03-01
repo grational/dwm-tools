@@ -7,7 +7,19 @@ use Data::Dumper;
 # Specify command line parameters {{{
 my $script;
 ($script = $0) =~ s!.*/!!;
-my $HELP_STRING="usage: $script --player=<sp(otify)|an(oise)|rh(ythmbox)> --command=<pp(playpause)|p(revious)|n(ext)> --find=<any_text_in_tags> --move=<[+-]HH:MM:SS|0-100%> [--switch|-s] [--bar|-b] [--help|-h] [--debug|-d]\n";
+my $HELP_STRING = << "END_USAGE";
+usage:
+  $script 
+    --player=<sp(otify)|an(oise)|rh(ythmbox)|mu(mpd)>
+    --command=<pp(playpause)|p(revious)|n(ext)|i(nfo)>
+    --find=<any_text_in_tags>
+    --move=<[+-]HH:MM:SS|0-100%>
+    [--switch|-s]
+    [--bar|-b]
+    [--help|-h]
+    [--debug|-d]
+END_USAGE
+
 my $load_debug = 0;
 my $notify_timeout = 2000;
 my $player_filter = '^(an|sp|rh|mu)$';
