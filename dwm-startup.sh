@@ -35,6 +35,11 @@ if ! pgrep unclutter &>/dev/null; then
 	unclutter -root -idle 1 &
 fi
 
+# prevent touchpad to steal focus accidentally during typing
+if ! pgrep syndaemon &>/dev/null; then
+	syndaemon -i .5 -R -d
+fi
+
 # Run timidity in pulseaudio-compatible mode (mostly to use vkeyboard)
 #$ if [ -z "$(pgrep timidity)" ]; then
 #if ! pgrep timidity &>/dev/null; then
