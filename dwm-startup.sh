@@ -57,9 +57,9 @@ setxkbmap -layout it -variant us -option caps:escape
 ## Fix Java Apps
 wmname LG3D # Pretend to be another window manager
 # Use motif toolkit for java applications
-#AWT_TOOLKIT=MToolkit; export AWT_TOOLKIT
+AWT_TOOLKIT=MToolkit; export AWT_TOOLKIT
 # Use env var to tell java that it's inside a non reparenting WM
-# _JAVA_AWT_WM_NONREPARENTING=1; export _JAVA_AWT_WM_NONREPARENTING
+_JAVA_AWT_WM_NONREPARENTING=1; export _JAVA_AWT_WM_NONREPARENTING
 
 # Start Music Player Daemon, conf=~/.mpdconf
 if ! pgrep mpd &>/dev/null; then
