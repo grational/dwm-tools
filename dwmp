@@ -156,21 +156,25 @@ print Dumper(\@sources) if $load_debug;
 
 # 2. If empty load @sources by qdbus {{{
 # ----------------------------------
-open(QDBUS,"qdbus |") || die "Failed load by qdbus: $!\n";
-while ( <QDBUS> ) {
-	chomp;
-	print "$_\n" if $load_debug;
-
-	if ( m/org[.]mpris[.]MediaPlayer2[.](\w*)/) {
-		my $pl = &FilterPlayer($1);
-		unless ( grep { $_->{player} eq $pl } @sources ) {
-			push @sources, { player => $pl };
-		}
-		print Dumper(\@sources) if $load_debug;
-	}
-}
-print "After qdbus\n" if $load_debug;
-print Dumper(\@sources) if $load_debug;
+# Giuseppe Ricupero
+# 07-07-2017 11.39
+# @reason: commented out because it does not work anymore on
+# the new lenovo l450
+# open(QDBUS,"qdbus |") || die "Failed load by qdbus: $!\n";
+# while ( <QDBUS> ) {
+# 	chomp;
+# 	print "$_\n" if $load_debug;
+# 
+# 	if ( m/org[.]mpris[.]MediaPlayer2[.](\w*)/) {
+# 		my $pl = &FilterPlayer($1);
+# 		unless ( grep { $_->{player} eq $pl } @sources ) {
+# 			push @sources, { player => $pl };
+# 		}
+# 		print Dumper(\@sources) if $load_debug;
+# 	}
+# }
+# print "After qdbus\n" if $load_debug;
+# print Dumper(\@sources) if $load_debug;
 # }}}
 
 # 3. Set the actual state of the players {{{
