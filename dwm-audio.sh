@@ -21,7 +21,7 @@ usage() {
 	echo ' [-h | --help]'
 }
 repeat() {
-  printf "${1}%.0s" $(seq 1 ${2}); echo
+	printf "${1}%.0s" $(seq 1 ${2}); echo
 }
 slog() {
 	if [[ 'x-hg' = "x${1}" ]]; then
@@ -32,6 +32,9 @@ slog() {
 	else
 		echo "[${SCRIPT_NAME}] ${@}"
 	fi
+}
+find_sink() {
+	pactl list sinks | paste -s | grep -oP '\d+(?=\s+Stato: \S+\s+Nome: \S+analog-stereo)'
 }
 
 if [[ $# -lt 1 ]]; then
@@ -47,41 +50,43 @@ SHORT='tidh'
 LONG='toggle-mute,inc-volume,dec-volume,help'
 PARSED=$(getopt --options ${SHORT} --longoptions ${LONG} --name "$0" -- "$@")
 if [[ $? != 0 ]]; then
-		exit 2
+	exit 2
 fi
 # Add -- at the end of line arguments
 eval set -- "${PARSED}"
 
 case "$1" in
-  -h|--help)
-    usage
-    exit 5
-    ;;
-  -t|--toggle-mute)
-    amixer -D pulse set Master 1+ toggle
-    # update statusbar, dwm-statusbar.sh has to be in the PATH
-    dwm-statusbar.sh
-    shift
-    ;;
-  -i|--inc-volume)
-    #amixer -q sset Master 3%+
-    pactl set-sink-volume 0 +5%
-    dwm-statusbar.sh
-    shift
-    ;;
-  -d|--dec-volume)
-    #amixer -q sset Master 3%-
-    #pactl set-sink-volume 0 -- -5%
-    pactl set-sink-volume 0 -5%
-    dwm-statusbar.sh
-    shift
-    ;;
-  --)
-    shift
-    exit 5
-    ;;
-  *)
-    slog "Parameters error"
-    exit 3
-    ;;
+	-h|--help)
+		usage
+		exit 5
+		;;
+	-t|--toggle-mute)
+		amixer -D pulse set Master 1+ toggle
+		# update statusbar, dwm-statusbar.sh has to be in the PATH
+		dwm-statusbar.sh
+		shift
+		;;
+	-i|--inc-volume)
+		# amixer -q sset Master 3%+
+		sink="$(find_sink)"
+		pactl set-sink-volume "$sink" +5%
+		dwm-statusbar.sh
+		shift
+		;;
+	-d|--dec-volume)
+		# pactl set-sink-volume 0 -- -5%
+		# amixer -q sset Master 3%-
+		sink="$(find_sink)"
+		pactl set-sink-volume "$sink" -5%
+		dwm-statusbar.sh
+		shift
+		;;
+	--)
+		shift
+		exit 5
+		;;
+	*)
+		slog "Parameters error"
+		exit 3
+		;;
 esac
