@@ -1,6 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-google-chrome --profile-directory=Default --app-id=knipolnnllmklapflnccelgolnpehhpl &
+app='google hangouts'
+handler="${HOME}/bin/dwm/dwm-tools/wrappers/browser-app.sh"
 
-# Use surf if chrome is too eager of resources
-#surf 'https://keep.google.com' &>/dev/null &
+"${handler}" "${app}"

@@ -1,5 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-app_id=fhbjgbiflinjbdggehcddcbncdddomop
+app='postman'
+handler="${HOME}/bin/dwm/dwm-tools/wrappers/browser-app.sh"
 
-google-chrome --profile-directory=Default --app-id=$app_id &
+"${handler}" "${app}"

@@ -1,3 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-google-chrome --profile-directory=Default --app-id=bgjohebimpjdhhocbknplfelpmdhifhd
+app='todoist'
+handler="${HOME}/bin/dwm/dwm-tools/wrappers/browser-app.sh"
+
+"${handler}" "${app}"
