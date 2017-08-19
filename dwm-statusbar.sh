@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+vpnc_status () {
+	vpnc_pid="$(pgrep vpnc)"
+	[ "$vpnc_pid" ] && echo up || echo down
+}
+
 DBOX="$(dropbox status | head -n1 | cut -b1-3)"
 if [[ "${DBOX}" == 'Dro' ]]; then
 	DBOX='-'
@@ -11,6 +16,7 @@ fi
 # WLAN="$(iwconfig wlan0 | grep -oP '(?<=ESSID:")[^"]*')"
 WLAN="$(nmcli device wifi list | sed -rn '1d; /^[*]/ s/ {2,}/;/gp' | awk -F';' 'END{print $2, $7}')"
 [[ ! $WLAN ]] && WLAN='-'
+VPN="$(vpnc_status)"
 #VOL="$(amixer get Master | grep -oP 'off(?=\])|\d+%(?=.*\[on\])')"
 VOL="$(pactl list sinks | perl -ne 'local $/; my $stdin = <>; print "$1" if ($stdin =~ /N[ao]me:\h+alsa_output.pci.*analog(?:.(?!\n\n))*?Mut[eo]:\h+(?:off|no).*?Volume:.*?(\d+%)/s)')"
 [[ ! $VOL ]] && VOL='off'
@@ -27,8 +33,10 @@ CPU="$(ps -A -o pcpu | tail -n+2 | paste -sd+ | bc)"
 HDD="$(df -lh | awk '{if ($6 == "/") { print $5 }}')"
 PLAYER=$(dwmp --bar)
 # Combine data
-HEAD="WL: ${WLAN} | DBOX: ${DBOX} | CPU: ${CPU}% | MEM: ${MEM}% | LOAD: ${LOAD}% | HDD: ${HDD} | T: ${TEMP}C"
-TAIL="VOL: ${VOL} | PL: ${PLAYER} | ${DATE}"
+HEAD="WL: $WLAN"
+[[ $VPN == up ]] && HEAD="$HEAD | VPN: $VPN"
+HEAD="$HEAD | DBOX: $DBOX | CPU: ${CPU}% | MEM: ${MEM}% | LOAD: ${LOAD}% | HDD: $HDD | T: ${TEMP}C"
+TAIL="VOL: $VOL | PL: $PLAYER | $DATE"
 if acpi -a | grep off-line > /dev/null; then
 	BAT="$(acpi -b | cut -d' ' -f4 | tr -d '%,')"
 	xsetroot -name "${HEAD} | BAT: ${BAT}% | ${TAIL}"
