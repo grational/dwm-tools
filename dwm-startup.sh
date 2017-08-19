@@ -25,7 +25,7 @@ fi
 # clipmenud &
 
 # Enable dual monitor
-xrandr --auto
+# xrandr --auto
 
 # set custom wallpapers
 "${HOME}"/bin/wallpaper-refresh
@@ -49,7 +49,7 @@ if ! pgrep dropbox &>/dev/null; then
 fi
 
 # run davmail to connect to exchange SeatPG server
-davmail &>/dev/null &
+# davmail &>/dev/null &
 
 # remove caps lock
 setxkbmap -layout it -variant us -option caps:escape
