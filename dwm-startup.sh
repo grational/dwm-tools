@@ -9,10 +9,14 @@ fi
 # xrdb -merge ~/.Xresources
 
 # Lock the screen after 10m inactivity
-xautolock -time 10 -locker slock &>/dev/null &
+if ! pgrep xautolock &>/dev/null; then
+	xautolock -time 10 -locker slock &>/dev/null &
+fi
 
 # Redshift (to hurt less the eyes)
-# redshift -l '45.090157:7.672748' &>/dev/null &
+if ! pgrep redshift &>/dev/null; then
+	redshift -l '45.090718:7.672538' &>/dev/null &
+fi
 
 ## ssh-agent
 # eval $(/usr/bin/killall ssh-agent; /usr/bin/ssh-agent)
@@ -27,7 +31,9 @@ xrandr --auto
 "${HOME}"/bin/wallpaper-refresh
 
 # Remove mouse cursor from screen after 1s inactivity
-unclutter -root -idle 1 &
+if ! pgrep unclutter &>/dev/null; then
+	unclutter -root -idle 1 &
+fi
 
 # Run timidity in pulseaudio-compatible mode (mostly to use vkeyboard)
 #$ if [ -z "$(pgrep timidity)" ]; then
@@ -36,8 +42,11 @@ unclutter -root -idle 1 &
 #fi
 
 # run dropbox
-ionice -c 3 dropbox start -i &>/dev/null &
-cpulimit -b -e dropbox -l 20
+if ! pgrep dropbox &>/dev/null; then
+	ionice -c 3 dropbox start -i &>/dev/null &
+	# ugly method to wait for the dropbox process to start
+	sleep 2 && cpulimit -b -l 20 -e dropbox
+fi
 
 # run davmail to connect to exchange SeatPG server
 davmail &>/dev/null &
