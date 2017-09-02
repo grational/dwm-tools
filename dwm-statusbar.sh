@@ -14,7 +14,7 @@ else
 fi
 #WLAN="$(iwconfig wlan0 | grep -oP '(?<=ESSID:)("[^"]*"|\S*)' | tr -d '"')"
 # WLAN="$(iwconfig wlan0 | grep -oP '(?<=ESSID:")[^"]*')"
-WLAN="$(nmcli device wifi list | sed -rn '1d; /^[*]/ s/ {2,}/;/gp' | awk -F';' 'END{print $2, $7}')"
+WLAN="$(nmcli device wifi list | sed -rn '1d; /^[*]/ s/ {2,}/;/gp' | awk -F';' 'END{if (NR) print $2, $7}')"
 [[ ! $WLAN ]] && WLAN='-'
 VPN="$(vpnc_status)"
 #VOL="$(amixer get Master | grep -oP 'off(?=\])|\d+%(?=.*\[on\])')"
