@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-app='google hangouts'
-handler="${HOME}/bin/dwm/dwm-tools/wrappers/browser-app.sh"
+# old chrome app handler
+# ----------------------
+# app='google hangouts'
+# handler="${HOME}/bin/dwm/dwm-tools/wrappers/browser-app.sh"
+# ${handler}" "${app}"
 
-"${handler}" "${app}"
+google-chrome --new-window --app=http://hangouts.google.com &

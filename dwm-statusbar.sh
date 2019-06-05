@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-vpnc_status () {
-	vpnc_pid="$(pgrep vpnc)"
+vpn_status () {
+	vpnc_pid="$(pgrep pppd)"
 	[ "$vpnc_pid" ] && echo up || echo down
 }
 
@@ -14,9 +14,8 @@ else
 fi
 #WLAN="$(iwconfig wlan0 | grep -oP '(?<=ESSID:)("[^"]*"|\S*)' | tr -d '"')"
 # WLAN="$(iwconfig wlan0 | grep -oP '(?<=ESSID:")[^"]*')"
-WLAN="$(nmcli device wifi list | sed -rn '1d; /^[*]/ s/ {2,}/;/gp' | awk -F';' 'END{if (NR) print $2, $7}')"
-[[ ! $WLAN ]] && WLAN='-'
-VPN="$(vpnc_status)"
+WLAN="$(nmcli device wifi list | sed -rn '1d; /^[*]/ s/ {2,}/;/gp' | awk -F';' 'END{if (NR) {sub(/-.*$/, "", $2); print $2, $7;} else print "-" }')"
+VPN="$(vpn_status)"
 #VOL="$(amixer get Master | grep -oP 'off(?=\])|\d+%(?=.*\[on\])')"
 VOL="$(pactl list sinks | perl -ne 'local $/; my $stdin = <>; print "$1" if ($stdin =~ /N[ao]me:\h+alsa_output.pci.*analog(?:.(?!\n\n))*?Mut[eo]:\h+(?:off|no).*?Volume:.*?(\d+%)/s)')"
 [[ ! $VOL ]] && VOL='off'
@@ -32,6 +31,7 @@ MEM="$(echo "scale=2; ${CURRENT}/${TOTAL}*100" | bc | cut -f1 -d'.')"
 CPU="$(ps -A -o pcpu | tail -n+2 | paste -sd+ | bc)"
 HDD="$(df -lh | awk '{if ($6 == "/") { print $5 }}')"
 PLAYER=$(dwmp --bar)
+if [[ $PLAYER == mpd ]]; then PROGRESS="$(mpc status | grep -oP '\d+:\d+/\d+:\d+')"; PLAYER="${PLAYER} ${PROGRESS}"; fi
 # Combine data
 HEAD="WL: $WLAN"
 [[ $VPN == up ]] && HEAD="$HEAD | VPN: $VPN"
@@ -44,7 +44,7 @@ if acpi -a | grep off-line > /dev/null; then
 	if [[ $BAT -le 10 ]]; then
 		xsetroot -name "LOW BATTERY! ${BAT}%"
 	elif [[ $BAT -le 3 ]]; then
-		sudo pm-suspend
+		systemctl suspend
 	fi
 else
 	xsetroot -name "${HEAD} | ${TAIL}"

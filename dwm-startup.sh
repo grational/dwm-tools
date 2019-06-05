@@ -71,6 +71,15 @@ if ! pgrep mpd &>/dev/null; then
   mpd
 fi
 
+# @Giuseppe Ricupero
+# @removed to use the default
+# if ! pgrep notify-osd; then
+# 	dunst &
+# fi
+
+# Enable graphical password request for sudo
+export SUDO_ASKPASS="${HOME}/bin/dpass"
+
 # Start `dwm` with a modified status bar
 UPDATE_PERIOD='15s'
 while true; do
