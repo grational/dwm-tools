@@ -14,6 +14,7 @@ usage:
 	--command=<pp(playpause)|p(revious)|n(ext)|i(nfo)>
 	--find=<any_text_in_tags>
 	--move=<[+-]HH:MM:SS|0-100%>
+	--jump|-j
 	[--reset|-r]
 	[--switch|-s]
 	[--bar|-b]
@@ -25,8 +26,8 @@ my $load_debug = 0;
 # ignored in ubuntu / gnome shell (see: man notify-send )
 my $notify_timeout = 2000;
 my $player_filter = '^(an|sp|rh|mu)$';
-my ($cli_hflag, $cli_debug, $cli_player, $cli_command,
-	  $cli_switch, $cli_bar, $cli_find, $cli_reset, $cli_move);
+my ($cli_hflag, $cli_debug, $cli_player, $cli_command, $cli_jump,
+	  $cli_reset, $cli_switch, $cli_bar, $cli_find,  $cli_move);
 GetOptions ( "help"      => \$cli_hflag,
              "debug"     => \$cli_debug,
              "player=s"  => \$cli_player,
@@ -35,7 +36,8 @@ GetOptions ( "help"      => \$cli_hflag,
              "bar"       => \$cli_bar,
              "find=s"    => \$cli_find,
              "reset"     => \$cli_reset,
-             "move=s"    => \$cli_move
+             "move=s"    => \$cli_move,
+             "jump"      => \$cli_jump
            );
 # }}}
 
@@ -85,6 +87,7 @@ use constant {
 	OFF          => 'OFF',
 	PP           => 'PlayPause',
 	PL           => 'PlayLastSong',
+	PJ           => 'JumpToSong',
 	N            => 'Next',
 	P            => 'Previous',
 	I            => 'Info',
@@ -116,6 +119,7 @@ if ( ! ( $cli_player
 			or $cli_switch
 			or $cli_bar
 			or $cli_find
+			or $cli_jump
 			or $cli_move) ) {
 	print $HELP_STRING; exit 5;
 }
@@ -270,6 +274,24 @@ elsif ( $cli_find ) {
 
 	# execute Play on the MPD
 	&ExecuteQDbusCmd(MPD,PL);
+} # }}}
+
+# CASE JUMP: select one song from the playlist through dmenu and play it {{{
+elsif ( $cli_jump ) {
+
+	my $selection_cmd = 'mpc playlist | grep -n "$(mpc playlist | dmenu -l 10)" | cut -d: -f1';
+	my $track_num = `$selection_cmd`;
+
+	if ( $track_num =~ /^\d+$/) {
+		# Pause all running players
+		foreach ( @pl_running ) {
+			&ExecuteQDbusCmd($_,PP,1);
+			$player_list{$_}{state} = IDLE;
+		}
+
+		# Play the chosen track
+		system('mpc', 'play', "${track_num}")
+	}
 } # }}}
 
 # CASE ROTATE: rotate between active players {{{
