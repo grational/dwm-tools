@@ -9,22 +9,24 @@ my $script;
 ($script = $0) =~ s!.*/!!;
 my $HELP_STRING = << "END_USAGE";
 usage:
-  $script 
-    --player=<sp(otify)|an(oise)|rh(ythmbox)|mu(mpd)>
-    --command=<pp(playpause)|p(revious)|n(ext)|i(nfo)>
-    --find=<any_text_in_tags>
-    --move=<[+-]HH:MM:SS|0-100%>
-    [--switch|-s]
-    [--bar|-b]
-    [--help|-h]
-    [--debug|-d]
+  $script
+	--player=<sp(otify)|an(oise)|rh(ythmbox)|mu(mpd)>
+	--command=<pp(playpause)|p(revious)|n(ext)|i(nfo)>
+	--find=<any_text_in_tags>
+	--move=<[+-]HH:MM:SS|0-100%>
+	[--reset|-r]
+	[--switch|-s]
+	[--bar|-b]
+	[--help|-h]
+	[--debug|-d]
 END_USAGE
 
 my $load_debug = 0;
 # ignored in ubuntu / gnome shell (see: man notify-send )
-my $notify_timeout = 2000; 
+my $notify_timeout = 2000;
 my $player_filter = '^(an|sp|rh|mu)$';
-my ($cli_hflag, $cli_debug, $cli_player, $cli_command, $cli_switch, $cli_bar, $cli_find, $cli_move);
+my ($cli_hflag, $cli_debug, $cli_player, $cli_command,
+	  $cli_switch, $cli_bar, $cli_find, $cli_reset, $cli_move);
 GetOptions ( "help"      => \$cli_hflag,
              "debug"     => \$cli_debug,
              "player=s"  => \$cli_player,
@@ -32,6 +34,7 @@ GetOptions ( "help"      => \$cli_hflag,
              "switch"    => \$cli_switch,
              "bar"       => \$cli_bar,
              "find=s"    => \$cli_find,
+             "reset"     => \$cli_reset,
              "move=s"    => \$cli_move
            );
 # }}}
@@ -81,6 +84,7 @@ use constant {
 	IDLE         => 'IDLE',
 	OFF          => 'OFF',
 	PP           => 'PlayPause',
+	PL           => 'PlayLastSong',
 	N            => 'Next',
 	P            => 'Previous',
 	I            => 'Info',
@@ -164,7 +168,7 @@ print Dumper(\@sources) if $load_debug;
 # while ( <QDBUS> ) {
 # 	chomp;
 # 	print "$_\n" if $load_debug;
-# 
+#
 # 	if ( m/org[.]mpris[.]MediaPlayer2[.](\w*)/) {
 # 		my $pl = &FilterPlayer($1);
 # 		unless ( grep { $_->{player} eq $pl } @sources ) {
@@ -239,6 +243,7 @@ if ( $cli_player ) {
 if ( $cli_move ) {
 	if ( grep { $_ eq MPD } @pl_running ) {
 		system("mpc","seek", "$cli_move");
+		system("dwm-statusbar.sh")
 	}
 } # }}}
 
@@ -254,16 +259,17 @@ elsif ( $cli_bar ) {
 
 # CASE FIND: search via mpc and start the playlist obtained {{{
 elsif ( $cli_find ) {
+	# find corresponding files and load them to the playlist
+	&FindNLoadMpcPlaylist($cli_find,$cli_reset);
+
 	# Pause all running players
 	foreach ( @pl_running ) {
 		&ExecuteQDbusCmd($_,PP,1);
 		$player_list{$_}{state} = IDLE;
 	}
 
-	# find corresponding files and load them to the playlist
-	&FindNLoadMpcPlaylist($cli_find);
 	# execute Play on the MPD
-	&ExecuteQDbusCmd(MPD,PP);
+	&ExecuteQDbusCmd(MPD,PL);
 } # }}}
 
 # CASE ROTATE: rotate between active players {{{
@@ -410,14 +416,16 @@ else {
 # --- Subprocedures ---
 # ---------------------
 sub FindNLoadMpcPlaylist() { # {{{
-	my $key = shift;
+	my $key   = shift;
+	my $reset =  shift;
+	`mpc clear` if $reset;
 	if ( $key =~ m/=([^~]+)/ ) {
 		my $upperkey = ucfirst lc $1;
-		`mpc clear; mpc find title "${upperkey}" | mpc add`
+		`mpc find title "${upperkey}" | dmenu -l 5 | mpc add`
 	} elsif ( $key =~ m/([^,]+)\h*[,;:]\h*([^,]+)/ ) {
-		`mpc clear; mpc search title "${1}" artist "${2}" | mpc add`
+		`mpc search title "${1}" artist "${2}" | dmenu -l 5 | mpc add`
 	} else {
-		`mpc clear; mpc search any "${key}" | mpc add`
+		`mpc search any "${key}" | dmenu -l 5 | mpc add`
 	}
 	return;
 } # }}}
@@ -445,6 +453,9 @@ sub ExecuteQDbusCmd() { # {{{
 			if ( $cmd eq PP ) {
 				$cmd_string = "mpc toggle"
 			}
+			elsif ( $cmd eq PL ) {
+				$cmd_string = 'mpc play $(mpc playlist | wc -l)'
+			}
 			elsif ( $cmd eq P ) {
 				$cmd_string = "mpc prev"
 			}
@@ -469,8 +480,8 @@ sub ExecuteQDbusCmd() { # {{{
 	# - playpause         => attivare se play (lo capiamo dallo stato precedente del player)
 	# - next / prev       => attivare (se player in play)
 	if (  ( $player eq ANOISE ) || ( $player eq MPD ) ) {
-		if ( ( ($cmd eq PP) && ($player_state ne RUNNING) ) 
-			|| ( ($player_state eq RUNNING) && ($cmd ne PP) ) 
+		if ( ( ($cmd eq PP) && ($player_state ne RUNNING) )
+			|| ( ($player_state eq RUNNING) && ($cmd ne PP) )
 		) {
 			&NotifySend($player, $player_state);
 		}
@@ -483,12 +494,12 @@ sub NotifySend() { # {{{
 	my $track;
 
 	if ( $player eq ANOISE ) {
-		$track = `lsof -p \$(ps x | awk '/anoise[.]py/ {print \$1}') | grep -oP '[^/]*(?=[.]ogg)' | tail -n1 | tr '_' ' ' | sed -r 's/\\b([a-z])/\\u\\1/g'`;
+		$track = `basename \$(ls -1tu \$(lsof -p \$(ps x | awk '/anoise[.]py/ {print \$1}') | grep -oP '\\S*([.](ogg|mp3))') | head -n1) | tr '_' ' ' | sed -r 's/\\b([a-z])/\\u\\1/g; s/[.]\\w+\$//'`;
 	} elsif ( $player eq MPD ) {
 		$track = `mpc current` || 'no track found';
 	}
 	chomp $track;
-	system('notify-send','-t',$notify_timeout,uc($player_list{$player}{name}),"Track: '${track}'")
+	system('notify-send','-t',$notify_timeout,'-h','string:x-canonical-private-synchronous:dwmp',uc($player_list{$player}{name}),"${track}")
 } # }}}
 
 sub FilterPlayer() { # {{{
