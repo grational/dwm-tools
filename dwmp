@@ -263,26 +263,31 @@ elsif ( $cli_bar ) {
 
 # CASE FIND: search via mpc and start the playlist obtained {{{
 elsif ( $cli_find ) {
+	my $playlist_size = `mpc playlist | wc -l`;
 	# find corresponding files and load them to the playlist
 	&FindNLoadMpcPlaylist($cli_find,$cli_reset);
 
-	# Pause all running players
-	foreach ( @pl_running ) {
-		&ExecuteQDbusCmd($_,PP,1);
-		$player_list{$_}{state} = IDLE;
-	}
+	if ( $playlist_size < `mpc playlist | wc -l` ) {
+		# Pause all running players
+		foreach ( @pl_running ) {
+			&ExecuteQDbusCmd($_,PP,1);
+			$player_list{$_}{state} = IDLE;
+		}
 
-	# execute Play on the MPD
-	&ExecuteQDbusCmd(MPD,PL);
+		&ExecuteQDbusCmd(MPD, PL);
+	}
 } # }}}
 
 # CASE JUMP: select one song from the playlist through dmenu and play it {{{
 elsif ( $cli_jump ) {
 
-	my $selection_cmd = 'mpc playlist | grep -n "$(mpc playlist | dmenu -l 10)" | cut -d: -f1';
-	my $track_num = `$selection_cmd`;
+	my $picktrack_cmd = 'mpc playlist | dmenu -i -l 10';
+	my $track = `$picktrack_cmd`; chomp $track;
 
-	if ( $track_num =~ /^\d+$/) {
+	if ( $track ) {
+		my $selection_cmd = "mpc playlist | grep -n '${track}' | cut -d: -f1 | head -n1";
+		my $track_num = `$selection_cmd`; chomp $track_num;
+
 		# Pause all running players
 		foreach ( @pl_running ) {
 			&ExecuteQDbusCmd($_,PP,1);
@@ -290,7 +295,7 @@ elsif ( $cli_jump ) {
 		}
 
 		# Play the chosen track
-		system('mpc', 'play', "${track_num}")
+		`mpc play ${track_num}`
 	}
 } # }}}
 
@@ -443,11 +448,11 @@ sub FindNLoadMpcPlaylist() { # {{{
 	`mpc clear` if $reset;
 	if ( $key =~ m/=([^~]+)/ ) {
 		my $upperkey = ucfirst lc $1;
-		`mpc find title "${upperkey}" | dmenu -l 5 | mpc add`
+		`mpc find title "${upperkey}" | dmenu -i -l 5 | mpc add`
 	} elsif ( $key =~ m/([^,]+)\h*[,;:]\h*([^,]+)/ ) {
-		`mpc search title "${1}" artist "${2}" | dmenu -l 5 | mpc add`
+		`mpc search title "${1}" artist "${2}" | dmenu -i -l 5 | mpc add`
 	} else {
-		`mpc search any "${key}" | dmenu -l 5 | mpc add`
+		`mpc search any "${key}" | dmenu -i -l 5 | mpc add`
 	}
 	return;
 } # }}}
