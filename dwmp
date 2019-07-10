@@ -273,9 +273,9 @@ elsif ( $cli_find ) {
 			&ExecuteQDbusCmd($_,PP,1);
 			$player_list{$_}{state} = IDLE;
 		}
-
 		&ExecuteQDbusCmd(MPD, PL);
 	}
+	&ExecuteQDbusCmd(MPD, PL) if $cli_reset;
 } # }}}
 
 # CASE JUMP: select one song from the playlist through dmenu and play it {{{
