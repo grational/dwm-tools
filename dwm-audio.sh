@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -euxo pipefail
 
 # Script: dwm-audio.sh
 # Author: Giuseppe Ricupero
@@ -34,7 +34,8 @@ slog() {
 	fi
 }
 find_sink() {
-	pactl list sinks | paste -s | grep -oP '\d+(?=\s+Stato: \S+\s+Nome: \S+analog-stereo)'
+	local matching_string='\d+(?=\h+Stato:\h+((RUNNINGh+Nome:\h+\H+(?:a2dp_sink|analog-stereo))|(\S+\h+Nome:\h+\H+analog-stereo)))'
+	pactl list sinks | paste -s | grep -oP "${matching_string}"
 }
 
 if [[ $# -lt 1 ]]; then

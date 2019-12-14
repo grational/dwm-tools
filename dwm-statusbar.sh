@@ -12,8 +12,8 @@ interval() {
 	date -u -d "0 ${final_date} sec -${start_date} sec" +"%T"
 }
 
-pomodoro_time="$(atq | head -n1 | cut -d' ' -f4)"
-if [[ -z $pomodoro_time ]]; then
+pomodoro_time="$(atq | head -n1 | grep -o '\([01][0-9]\|2[0-3]\):[0-5][0-9]:[0-5][0-9]' || echo -)"
+if [[ $pomodoro_time == - ]]; then
 	POMO='-'
 else
 	current_time="$(date +%T)"
@@ -30,11 +30,10 @@ fi
 # WLAN="$(iwconfig wlan0 | grep -oP '(?<=ESSID:")[^"]*')"
 WLAN="$(nmcli device wifi list | sed -rn '1d; /^[*]/ s/ {2,}/;/gp' | awk -F';' 'END{if (NR) {sub(/-.*$/, "", $2); print $2, $7;} else print "-" }')"
 VPN="$(vpn_status)"
-#VOL="$(amixer get Master | grep -oP 'off(?=\])|\d+%(?=.*\[on\])')"
-VOL="$(pactl list sinks | perl -ne 'local $/; my $stdin = <>; print "$1" if ($stdin =~ /N[ao]me:\h+alsa_output.pci.*analog(?:.(?!\n\n))*?Mut[eo]:\h+(?:off|no).*?Volume:.*?(\d+%)/s)')"
+# VOL: first select bluez headset volume if available then the analog one
+VOL="$(pactl list sinks | perl -ne 'local $/; my $stdin = <>; print "$1" if ($stdin =~ /N[ao]me:\h+bluez_sink(?:.(?!\n\n))*?Mut[eo]:\h+(?:off|no).*?Volume:.*?(\d+%)/s)')"
+[[ ! $VOL ]] && VOL="$(pactl list sinks | perl -ne 'local $/; my $stdin = <>; print "$1" if ($stdin =~ /N[ao]me:\h+alsa_output.pci.*analog(?:.(?!\n\n))*?Mut[eo]:\h+(?:off|no).*?Volume:.*?(\d+%)/s)')"
 [[ ! $VOL ]] && VOL='🔇' || VOL="🔊 ${VOL}"
-#VOL="$(amixer get Master | egrep -o '[0-9]+%')"
-#VOL="$(amixer get Master | awk '/[0-9]+%/ { gsub(/[][]/,""); printf("%s",$4)  }')"
 TEMP="$(grep -o '^[0-9][0-9]' /sys/class/thermal/thermal_zone0/temp)"
 DATE="$(date '+%a, %d.%m.%Y %H:%M')"
 LOAD=$(echo "$(cut -d' ' -f1 /proc/loadavg)*100" | bc | sed 's/\.[0-9]*//')
@@ -47,8 +46,8 @@ HDD="$(df -lh | awk '{if ($6 == "/") { print $5 }}')"
 PLAYER=$(dwmp --bar)
 if [[ $PLAYER == mpd ]]; then PROGRESS="$(mpc status | grep -oP '\d+:\d+/\d+:\d+')"; PLAYER="${PLAYER} ${PROGRESS}"; fi
 # Combine data
+separator=' · '
 HEAD=" 📶 $WLAN"
-separator='   '
 [[ $POMO != - ]] && HEAD="${HEAD}${separator}🍅 ${POMO}"
 [[ $VPN == up ]] && HEAD="${HEAD}${separator}🔒 ${VPN}"
 [[ $DBOX != - ]] && HEAD="${HEAD}${separator}🎁 ${DBOX}"
