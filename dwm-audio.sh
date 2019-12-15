@@ -34,8 +34,10 @@ slog() {
 	fi
 }
 find_sink() {
-	local matching_string='\d+(?=\h+Stato:\h+((RUNNINGh+Nome:\h+\H+(?:a2dp_sink|analog-stereo))|(\S+\h+Nome:\h+\H+analog-stereo)))'
-	pactl list sinks | paste -s | grep -oP "${matching_string}"
+	local sinks="$(pactl list sinks | paste -s)"
+	local result="$(grep -oP '\d+(?=\h+Stato:\h+RUNNING\h+Nome:\h+\H+(?:a2dp_sink|analog-stereo))' <<< "${sinks}")"
+	[[ ! $result ]] && result="$(grep -oP '\d+(?=\h+Stato:\h+(\S+\h+Nome:\h+\H+analog-stereo))' <<< "${sinks}")"
+	echo "${result}"
 }
 
 if [[ $# -lt 1 ]]; then
