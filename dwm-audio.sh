@@ -15,7 +15,7 @@ SCRIPT_NAME="${0##*/}"
 
 usage() {
 	echo "${SCRIPT_NAME} usage:"
-	echo ' [-t | --mute]'
+	echo ' [-t | --toggle-mute]'
 	echo ' [-i | --inc-volume]'
 	echo ' [-d | --dec-volume]'
 	echo ' [-h | --help]'

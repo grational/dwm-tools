@@ -10,7 +10,7 @@ fi
 
 # Lock the screen after 10m inactivity
 if ! pgrep xautolock &>/dev/null; then
-	xautolock -time 10 -locker slock &>/dev/null &
+	xautolock -time 20 -locker slock &>/dev/null &
 fi
 
 # Redshift (to hurt less the eyes)
@@ -76,6 +76,10 @@ fi
 # if ! pgrep notify-osd; then
 # 	dunst &
 # fi
+
+if ! pgrep rescuetime &>/dev/null; then
+	rescuetime &
+fi
 
 # Enable graphical password request for sudo
 export SUDO_ASKPASS="${HOME}/bin/dpass"

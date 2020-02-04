@@ -12,7 +12,7 @@ interval() {
 	date -u -d "0 ${final_date} sec -${start_date} sec" +"%T"
 }
 
-pomodoro_time="$(atq | head -n1 | grep -o '\([01][0-9]\|2[0-3]\):[0-5][0-9]:[0-5][0-9]' || echo -)"
+pomodoro_time="$(atq -q 'p'| head -n1 | grep -o '\([01][0-9]\|2[0-3]\):[0-5][0-9]:[0-5][0-9]' || echo -)"
 if [[ $pomodoro_time == - ]]; then
 	POMO='-'
 else
